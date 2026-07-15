@@ -1,0 +1,45 @@
+{
+  "fixture": "Nontechnical mental-health professional",
+  "self_description": "I work in mental health and keep noticing how much people's language reveals about recurring patterns. I am curious about AI for self-reflection, but I worry about dependency, false certainty, and systems pretending to be therapists. I often repeat the same client education about those boundaries and would like to make it easier to understand.",
+  "required_anchors": [
+    "language",
+    "reflection",
+    "safe",
+    "client"
+  ],
+  "forbidden_anchors": [
+    "fridge",
+    "recipe",
+    "meal plan"
+  ],
+  "possibilities": [
+    {
+      "label": "Boundary guide",
+      "why_fit": "You repeatedly explain where safe AI reflection ends and therapy begins.",
+      "what_they_do": "Shape a plain-language interactive client guide that distinguishes reflection prompts, warning signs, and professional support.",
+      "first_10_30_minutes": "A one-page branching guide built from anonymized examples, with clear safety language and no clinical claims.",
+      "mode": "practical non-software"
+    },
+    {
+      "label": "Language pattern lab",
+      "why_fit": "You are drawn to recurring language patterns but cautious about false certainty.",
+      "what_they_do": "Design a local explorer for anonymized sample writing that highlights repeated phrases while separating observation from interpretation.",
+      "first_10_30_minutes": "A tiny offline prototype using invented text and a visible limitations panel.",
+      "mode": "software exploratory"
+    },
+    {
+      "label": "Dependency map",
+      "why_fit": "Your concern about AI self-reflection is not only whether it works, but how reliance changes over time.",
+      "what_they_do": "Map helpful uses, escalation risks, and questions a person can ask before turning to AI again.",
+      "first_10_30_minutes": "A compact decision map suitable for discussion or client education.",
+      "mode": "exploratory immediate"
+    },
+    {
+      "label": "Surprise me",
+      "why_fit": "This combines your interest in language with your wish to communicate safe boundaries without pretending to diagnose anyone.",
+      "what_they_do": "Create a choose-your-own-reflection story where wording changes what the reader notices, followed by a transparent debrief.",
+      "first_10_30_minutes": "One short interactive scene plus a safety-focused explanation of what the exercise can and cannot reveal.",
+      "mode": "creative surprising"
+    }
+  ]
+}

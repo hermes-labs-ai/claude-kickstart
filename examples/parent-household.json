@@ -1,0 +1,45 @@
+{
+  "fixture": "Parent organizing daily life and family memory",
+  "self_description": "I am a parent and most evenings I am trying to make dinner from what is already in the fridge. We change recipes constantly, then forget the version everyone actually liked. I also have family stories and old recipe notes scattered everywhere. I want the household to feel easier without turning it into a rigid system.",
+  "required_anchors": [
+    "fridge",
+    "recipe",
+    "family",
+    "household"
+  ],
+  "forbidden_anchors": [
+    "therapist",
+    "client education",
+    "clinical"
+  ],
+  "possibilities": [
+    {
+      "label": "Fridge rescue",
+      "why_fit": "Dinner begins with what is already in your fridge, not with an ideal shopping list.",
+      "what_they_do": "Make a flexible meal helper that asks what needs using and remembers substitutions your household liked.",
+      "first_10_30_minutes": "A local form and three useful meal paths from tonight's ingredients.",
+      "mode": "software practical"
+    },
+    {
+      "label": "Family recipe trail",
+      "why_fit": "Your recipes carry family stories, but both the story and the successful variation get scattered.",
+      "what_they_do": "Turn one recipe note into a living page with its origin, variations, reactions, and unanswered memories.",
+      "first_10_30_minutes": "One polished family recipe page and a reusable capture template.",
+      "mode": "creative non-software"
+    },
+    {
+      "label": "Gentle household rhythm",
+      "why_fit": "You want daily life to be easier without installing a rigid productivity system.",
+      "what_they_do": "Identify one recurring household bottleneck and design a lightweight cue that preserves improvisation.",
+      "first_10_30_minutes": "A one-week experiment with one cue, one fallback, and no chore dashboard.",
+      "mode": "exploratory immediate"
+    },
+    {
+      "label": "Surprise me",
+      "why_fit": "This combines meal improvisation with family memory rather than treating them as separate chores.",
+      "what_they_do": "Create a dinner-story generator that pairs a flexible recipe prompt with one family question worth preserving.",
+      "first_10_30_minutes": "Tonight's ingredient-based prompt, one story question, and a simple page to save both answers.",
+      "mode": "creative surprising"
+    }
+  ]
+}

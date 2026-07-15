@@ -1,0 +1,16 @@
+.DS_Store
+*.log
+*.tmp
+*.bak
+node_modules/
+dist/
+build/
+.venv/
+__pycache__/
+
+# Claude Kickstart's real user data is private and project-local.
+claude-kickstart/state/*.json
+claude-kickstart/state/*.md
+claude-kickstart/creations/*
+!claude-kickstart/state/.gitignore
+!claude-kickstart/creations/.gitignore
