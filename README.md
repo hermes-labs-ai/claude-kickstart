@@ -92,7 +92,7 @@ This is defense in depth, not an operating-system sandbox. Always read Claude Co
 This draft branch adds a project-local Python installer. It is not published on PyPI yet. Once this pull request is reviewed and merged, the GitHub form can be tested with:
 
 ```sh
-pip install "git+https://github.com/roli-lpci/claude-kickstart.git"
+pip install "git+https://github.com/hermes-labs-ai/claude-kickstart.git"
 claude-kickstart install
 ```
 
