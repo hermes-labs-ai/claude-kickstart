@@ -12,7 +12,7 @@ You need [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) 
 
 Open Claude Code in an empty folder and paste this sentence:
 
-> Install Claude Kickstart from https://github.com/roli-lpci/claude-kickstart. Keep it local to this folder, explain anything I need to approve, and tell me when I can run `/kickstart`.
+> Install Claude Kickstart from https://github.com/hermes-labs-ai/claude-kickstart into this current folder. Keep everything project-local, explain anything I need to approve, and tell me when I can run `/kickstart`.
 
 Claude will download the repository and run the installer. Restart Claude Code in the installed folder once so its project command and safety settings are loaded, then type:
 
@@ -95,6 +95,16 @@ Windows PowerShell:
 Installation is project-local and repeatable. It initializes only missing state and never overwrites your portrait, history, or creations.
 
 To stop using it, run `/leave-kickstart`. Because the installation is self-contained, you can then archive or remove the repository whenever you no longer need the local portrait or creations. Nothing global needs uninstalling.
+
+## If something does not work
+
+- **`/kickstart` is not recognized:** fully quit Claude Code, reopen it inside the folder containing `.claude`, and try again. Project commands are discovered when a session starts.
+- **Claude says a required file is missing:** make sure you opened the downloaded `claude-kickstart` folder, then run the installer again. It will explain what is missing without guessing or overwriting files.
+- **Node.js is missing or too old:** install Node.js 18 or newer, confirm `node --version` works, and rerun the installer.
+- **You see a workspace trust screen:** confirm the folder came from `hermes-labs-ai/claude-kickstart`, review the listed project permissions, and proceed only if you trust it.
+- **You stopped halfway through:** reopen the same folder and run `/kickstart`; your pending stage should resume.
+
+If the problem remains, open a [GitHub issue](https://github.com/hermes-labs-ai/claude-kickstart/issues) without including private portrait or session content.
 
 ## Requirements and honest limits
 
