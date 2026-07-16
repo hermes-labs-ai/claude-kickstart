@@ -12,15 +12,23 @@ You need [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) 
 
 Open Claude Code in an empty folder and paste this sentence:
 
-> Install Claude Kickstart from https://github.com/hermes-labs-ai/claude-kickstart into this current folder. Keep everything project-local, explain anything I need to approve, and tell me when I can run `/kickstart`.
+> Help me install Claude Kickstart from https://github.com/hermes-labs-ai/claude-kickstart in this current empty folder. I am completely new to Claude Code. Before you download anything, briefly explain what it is, confirm everything will stay inside this project, and tell me that I will close and reopen Claude Code once so the native project command and safety settings can load. Then install it and give me the exact folder plus copy-paste steps to exit, reopen Claude Code there, and type `/kickstart`, including what to do if that command is not recognized.
 
-Claude will download the repository and run the installer. Restart Claude Code in the installed folder once so its project command and safety settings are loaded, then type:
+Claude will explain the download before doing it, install everything in the current folder, and then print the exact path and commands for the one required reopen. Claude Code discovers newly installed project commands and settings when a session starts, so this reopen is part of installation—not an error.
+
+The handoff will look like this, using your actual folder path:
+
+1. Type `/exit` in Claude Code.
+2. Run the exact `cd` command the installer gives you.
+3. Run `claude`.
+4. If Claude Code shows a workspace trust screen, confirm it names the folder the installer printed, review the project permissions, and choose **Yes, I trust this folder**.
+5. In the newly opened session, type:
 
 ```text
 /kickstart
 ```
 
-That is the only command you need to begin.
+That is the only Kickstart command you need to begin.
 
 ## What your first session feels like
 
@@ -98,7 +106,7 @@ To stop using it, run `/leave-kickstart`. Because the installation is self-conta
 
 ## If something does not work
 
-- **`/kickstart` is not recognized:** fully quit Claude Code, reopen it inside the folder containing `.claude`, and try again. Project commands are discovered when a session starts.
+- **`/kickstart` is not recognized:** type `/exit`; run the exact `cd` command printed by the installer; run `claude`; and try `/kickstart` again. If it still fails, tell Claude: “Verify `.claude/commands/kickstart.md` in this folder and repair only this project-local installation.”
 - **Claude says a required file is missing:** make sure you opened the downloaded `claude-kickstart` folder, then run the installer again. It will explain what is missing without guessing or overwriting files.
 - **Node.js is missing or too old:** install Node.js 18 or newer, confirm `node --version` works, and rerun the installer.
 - **You see a workspace trust screen:** confirm the folder came from `hermes-labs-ai/claude-kickstart`, review the listed project permissions, and proceed only if you trust it.
@@ -111,6 +119,7 @@ If the problem remains, open a [GitHub issue](https://github.com/hermes-labs-ai/
 - Claude Code 2.1 or newer
 - Node.js 18 or newer
 - Tested on macOS with the current Claude Code CLI
+- One close-and-reopen is required after the first installation so Claude Code can discover Kickstart's project command, safety settings, and lifecycle hooks
 - Shell installer exercised on macOS; the PowerShell installer is syntax- and logic-checked but has not been run on Windows in this release
 - Claude generates the adaptive questions and possibilities at runtime, so exact wording varies
 - If Claude Code's native selector is unavailable, Kickstart uses a numbered text fallback

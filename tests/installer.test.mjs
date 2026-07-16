@@ -35,7 +35,15 @@ test("shell installer works by absolute path, is repeatable, and writes no tempo
   fs.rmSync(state, { force: true });
   const first = install(repo, home);
   assert.equal(first.status, 0, first.stdout + first.stderr);
-  assert.match(first.stdout, /ready in this folder/);
+  assert.match(first.stdout, /installation succeeded/);
+  assert.match(first.stdout, new RegExp(`Open this exact folder: ${repo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  assert.match(first.stdout, /must be closed and reopened once/);
+  assert.match(first.stdout, /type: \/exit/);
+  assert.match(first.stdout, /Run: claude/);
+  assert.match(first.stdout, /workspace trust screen/);
+  assert.match(first.stdout, /Yes, I trust this folder/);
+  assert.match(first.stdout, /type: \/kickstart/);
+  assert.match(first.stdout, /If \/kickstart is not recognized/);
   assert.equal(JSON.parse(fs.readFileSync(state, "utf8")).mode, "inactive");
   const before = digest(state);
   const second = install(repo, home);
@@ -69,6 +77,22 @@ test("missing required file produces beginner-readable failure with no guessed r
   assert.equal(fs.existsSync(missing), false);
 });
 
+test("beginner quick start explains and completes the one required reopen", () => {
+  const readme = fs.readFileSync(path.join(SOURCE, "README.md"), "utf8");
+  const demo = fs.readFileSync(path.join(SOURCE, "DEMO.md"), "utf8");
+  for (const text of [readme, demo]) {
+    assert.match(text, /I am completely new to Claude Code/);
+    assert.match(text, /Before you download anything/);
+    assert.match(text, /everything will stay inside this project/);
+    assert.match(text, /close and reopen Claude Code once/);
+    assert.match(text, /exact folder plus copy-paste steps/);
+    assert.match(text, /if that command is not recognized/);
+  }
+  assert.match(readme, /type `\/exit`/);
+  assert.match(readme, /Run the exact `cd` command/);
+  assert.match(readme, /Run `claude`/);
+});
+
 test("installer scripts pass local static checks", () => {
   const bashCheck = spawnSync("bash", ["-n", path.join(SOURCE, "install.sh")], { encoding: "utf8" });
   assert.equal(bashCheck.status, 0, bashCheck.stderr);
@@ -80,5 +104,14 @@ test("installer scripts pass local static checks", () => {
     "Join-Path",
     "Test-Path -LiteralPath",
     "ConvertFrom-Json",
+    "installation succeeded",
+    "Open this exact folder:",
+    "must be closed and reopened once",
+    "type: /exit",
+    "Run: claude",
+    "workspace trust screen",
+    "Yes, I trust this folder",
+    "type: /kickstart",
+    "If /kickstart is not recognized",
   ]) assert.match(ps, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });

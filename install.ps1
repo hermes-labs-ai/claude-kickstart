@@ -81,7 +81,17 @@ try {
     Pop-Location
 }
 
-Write-Host 'Claude Kickstart is ready in this folder.'
+Write-Host 'Claude Kickstart installation succeeded.'
 Write-Host "What changed: $Changed."
 Write-Host 'Nothing was written to global Claude Code settings or outside this repository.'
-Write-Host 'In Claude Code, run: /kickstart'
+Write-Host "Open this exact folder: $Root"
+Write-Host 'Claude Code must be closed and reopened once so the new project command and safety settings load.'
+Write-Host 'Do these exact steps:'
+Write-Host '1. In the current Claude Code conversation, type: /exit'
+Write-Host '2. Back in PowerShell, run:'
+Write-Host "   Set-Location -LiteralPath '$Root'"
+Write-Host '3. Run: claude'
+Write-Host '4. If a workspace trust screen appears, confirm it shows the exact folder above, review the project permissions, and choose: Yes, I trust this folder'
+Write-Host '5. In the newly opened Claude Code conversation, type: /kickstart'
+Write-Host 'If /kickstart is not recognized, type /exit, run the exact Set-Location and claude commands above again, then retry /kickstart.'
+Write-Host 'If it still fails, ask Claude to verify .claude/commands/kickstart.md in the exact folder above and repair only this project-local installation.'
