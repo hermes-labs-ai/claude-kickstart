@@ -246,10 +246,23 @@ test("interview choice is durable and mechanically blocks history extraction", (
   assert.equal(choice.status.history_choice, "interview");
   assert.equal(choice.status.stage, "awaiting_self_description");
   run(repo, ["history-extract"], { env, expectFailure: true });
+  run(repo, ["checkpoint", "awaiting_history_choice"], { env, expectFailure: true });
+  run(repo, ["leave"], { env });
+  run(repo, ["enter"], { env });
+  run(repo, ["checkpoint", "awaiting_history_choice"], { env, expectFailure: true });
+  run(repo, ["history-extract"], { env, expectFailure: true });
   assert.equal(
     JSON.parse(run(repo, ["status"], { env }).stdout).status.history_choice,
     "interview",
   );
+
+  // A confirmed reset is the explicit engine-owned way to clear the durable
+  // decline and start a genuinely new onboarding choice.
+  run(repo, ["reset", "--confirm"], { env });
+  run(repo, ["enter"], { env });
+  run(repo, ["checkpoint", "awaiting_history_choice"], { env });
+  run(repo, ["history-choice", "use-history"], { env });
+  assert.equal(run(repo, ["history-extract"], { env }).status, 0);
 });
 
 test("portrait-verify enforces verbatim quotes against the extracted corpus", () => {

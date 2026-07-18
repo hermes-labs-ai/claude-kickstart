@@ -325,6 +325,9 @@ function checkpoint(stage, extra = {}) {
   if (!STAGES.has(stage)) throw new Error(`Unknown checkpoint stage: ${stage}`);
   const status = loadStatus();
   if (status.mode !== "active") throw new Error("Enter Claude Kickstart before checkpointing onboarding");
+  if (stage === "awaiting_history_choice" && status.history_choice === "interview") {
+    throw new Error("History was declined; reset or delete the portrait before reopening the fast lane");
+  }
   status.onboarding_status = "in_progress";
   if (
     status.stage === "awaiting_history_choice" &&
