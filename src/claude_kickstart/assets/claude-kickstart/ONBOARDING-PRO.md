@@ -29,12 +29,18 @@ call, header `Fast lane`, single-select:
 
 Before the question, say plainly in one or two sentences: this reads their own past
 Claude Code messages and local memory notes, entirely on this machine, and nothing is
-kept without their review. If they choose the interview, never read history and continue
-at `awaiting_self_description`. If they choose their history, run:
+kept without their review. Record the answer through the engine; prose alone is not
+consent. If they choose the interview, run `history-choice interview`. That transition
+durably records the decline, moves to `awaiting_self_description`, and mechanically
+blocks extraction. If they choose their history, run these two commands separately:
 
 ```text
+node claude-kickstart/bin/kickstart-state.mjs history-choice use-history
 node claude-kickstart/bin/kickstart-state.mjs history-extract
 ```
+
+The engine accepts `use-history` only at `awaiting_history_choice` while the local corpus
+is eligible. Extraction rechecks both that recorded consent and current eligibility.
 
 ## Synthesizing the derived portrait
 

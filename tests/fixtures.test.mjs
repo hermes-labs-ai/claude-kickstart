@@ -79,8 +79,23 @@ test("project settings retain manual permissions and secret-file denials", () =>
   assert.ok(settings.permissions.ask.includes("WebFetch"));
   assert.ok(settings.permissions.allow.includes("Edit(claude-kickstart/state/**)"));
   assert.ok(settings.permissions.allow.includes("Bash(node claude-kickstart/bin/kickstart-state.mjs enter)"));
+  assert.ok(settings.permissions.allow.includes("Bash(node claude-kickstart/bin/kickstart-state.mjs history-choice use-history)"));
+  assert.ok(settings.permissions.allow.includes("Bash(node claude-kickstart/bin/kickstart-state.mjs history-choice interview)"));
   assert.ok(settings.permissions.deny.includes("Read(~/.ssh/**)"));
   assert.ok(settings.permissions.deny.includes("Edit(**/.env.*)"));
   assert.ok(settings.hooks.SessionStart);
   assert.ok(settings.hooks.SessionEnd);
+});
+
+test("public privacy surface binds consent, decline, and private-corpus deletion", () => {
+  const readme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
+  const runtime = fs.readFileSync(path.join(ROOT, "claude-kickstart/RUNTIME.md"), "utf8");
+  const pro = fs.readFileSync(path.join(ROOT, "claude-kickstart/ONBOARDING-PRO.md"), "utf8");
+  assert.match(readme, /engine-recorded choice/i);
+  assert.match(readme, /choosing the interview mechanically blocks extraction/i);
+  assert.match(readme, /deleted with either “Delete my portrait” or reset/i);
+  assert.match(runtime, /history-choice <use-history\|interview>/);
+  assert.match(pro, /history-choice interview/);
+  assert.match(pro, /history-choice use-history/);
+  assert.match(pro, /Extraction rechecks both that recorded consent and current eligibility/);
 });

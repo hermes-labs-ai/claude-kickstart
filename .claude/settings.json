@@ -15,6 +15,8 @@
       "Bash(node claude-kickstart/bin/kickstart-state.mjs checkpoint awaiting_self_description files-here-okay)",
       "Bash(node claude-kickstart/bin/kickstart-state.mjs checkpoint awaiting_self_description ask-every-time)",
       "Bash(node claude-kickstart/bin/kickstart-state.mjs checkpoint awaiting_history_choice)",
+      "Bash(node claude-kickstart/bin/kickstart-state.mjs history-choice use-history)",
+      "Bash(node claude-kickstart/bin/kickstart-state.mjs history-choice interview)",
       "Bash(node claude-kickstart/bin/kickstart-state.mjs history-scan)",
       "Bash(node claude-kickstart/bin/kickstart-state.mjs history-extract)",
       "Bash(node claude-kickstart/bin/kickstart-state.mjs portrait-verify)",

@@ -52,6 +52,7 @@ const EVIDENCE_TYPES = new Set([
   "asked_underlying_mechanism",
 ]);
 const GUIDANCE_PREFERENCES = new Set(["adaptive", "simpler", "advanced"]);
+const HISTORY_CHOICES = new Set([null, "use-history", "interview"]);
 
 function now() {
   return new Date().toISOString();
@@ -70,6 +71,7 @@ function defaultStatus() {
     stage: "welcome",
     reset_status: "none",
     safety_choice: null,
+    history_choice: null,
     selected_direction: null,
     interruption_count: 0,
     last_event: "initialized",
@@ -205,6 +207,13 @@ function validateStatus(value) {
   if (!Number.isInteger(value.interruption_count) || value.interruption_count < 0) {
     throw new Error("invalid interruption count");
   }
+  // Status files created before the existing-history lane did not carry this
+  // field. Treat them as having made no choice rather than corrupting/replacing
+  // otherwise valid user state.
+  if (value.history_choice === undefined) value.history_choice = null;
+  if (!HISTORY_CHOICES.has(value.history_choice)) {
+    throw new Error(`invalid history choice: ${value.history_choice}`);
+  }
   return value;
 }
 
@@ -317,10 +326,47 @@ function checkpoint(stage, extra = {}) {
   const status = loadStatus();
   if (status.mode !== "active") throw new Error("Enter Claude Kickstart before checkpointing onboarding");
   status.onboarding_status = "in_progress";
+  if (
+    status.stage === "awaiting_history_choice" &&
+    stage !== "awaiting_history_choice" &&
+    status.history_choice === null
+  ) {
+    throw new Error("Record the history choice before leaving awaiting_history_choice");
+  }
   status.stage = stage;
+  if (stage === "awaiting_history_choice") status.history_choice = null;
   if (extra.safety_choice) status.safety_choice = extra.safety_choice;
   saveStatus(status, `checkpoint:${stage}`);
   return { ok: true, action: "checkpoint", stage, status };
+}
+
+function recordHistoryChoice(choice) {
+  if (!HISTORY_CHOICES.has(choice) || choice === null) {
+    throw new Error("History choice must be use-history or interview");
+  }
+  const status = loadStatus();
+  if (status.mode !== "active") {
+    throw new Error("Enter Claude Kickstart before recording the history choice");
+  }
+  if (status.stage !== "awaiting_history_choice") {
+    throw new Error("History choice is only valid at awaiting_history_choice");
+  }
+  if (choice === "use-history") {
+    const scan = historyScan();
+    if (!scan.eligible) {
+      throw new Error("History fast lane is unavailable because the local history is not eligible");
+    }
+  }
+  status.history_choice = choice;
+  if (choice === "interview") status.stage = "awaiting_self_description";
+  saveStatus(status, `history_choice:${choice}`);
+  return {
+    ok: true,
+    action: "history_choice_recorded",
+    choice,
+    next_stage: status.stage,
+    status,
+  };
 }
 
 function complete() {
@@ -368,6 +414,7 @@ function requestReset() {
 }
 
 function resetConfirmed() {
+  const corpusDeleted = deleteProCorpus();
   const previous = loadStatus();
   const reset = defaultStatus();
   reset.reset_status = "completed";
@@ -384,11 +431,13 @@ function resetConfirmed() {
     ok: true,
     action: "reset",
     preserved: ["claude-kickstart/creations/"],
+    private_corpus_deleted: corpusDeleted,
     status: reset,
   };
 }
 
 function clearPortrait() {
+  const corpusDeleted = deleteProCorpus();
   const status = loadStatus();
   atomicWrite(PORTRAIT_FILE, PORTRAIT_TEMPLATE);
   atomicWrite(NOTES_FILE, NOTES_TEMPLATE);
@@ -399,8 +448,15 @@ function clearPortrait() {
     status.onboarding_status = "not_started";
     status.stage = "welcome";
   }
+  status.history_choice = null;
   saveStatus(status, "portrait_deleted");
-  return { ok: true, action: "portrait_deleted", creations_preserved: true, status };
+  return {
+    ok: true,
+    action: "portrait_deleted",
+    creations_preserved: true,
+    private_corpus_deleted: corpusDeleted,
+    status,
+  };
 }
 
 function selectDirection(text) {
@@ -486,6 +542,13 @@ const ELIGIBLE_MIN_SESSIONS = 5;
 const ELIGIBLE_MIN_MESSAGES = 100;
 const EXTRACT_SESSION_CAP = 80;
 const MEMORY_CHUNK_CAP = 120;
+
+function deleteProCorpus() {
+  if (!fs.existsSync(PRO_CORPUS_FILE)) return false;
+  assertLocalPath(PRO_CORPUS_FILE);
+  fs.unlinkSync(PRO_CORPUS_FILE);
+  return true;
+}
 
 function usableUserMessages(file) {
   const messages = [];
@@ -579,7 +642,7 @@ function memoryChunks() {
   if (!fs.existsSync(PROJECTS_DIR)) return chunks;
   for (const project of fs.readdirSync(PROJECTS_DIR, { withFileTypes: true })) {
     if (chunks.length >= MEMORY_CHUNK_CAP) break;
-    if (!project.isDirectory()) continue;
+    if (!project.isDirectory() || project.name === "-") continue;
     const memoryDir = path.join(PROJECTS_DIR, project.name, "memory");
     if (!fs.existsSync(memoryDir)) continue;
     for (const name of fs.readdirSync(memoryDir).sort()) {
@@ -615,6 +678,13 @@ function memoryChunks() {
 function historyExtract() {
   const status = loadStatus();
   if (status.mode !== "active") throw new Error("Enter Claude Kickstart before extracting history");
+  if (status.stage !== "awaiting_history_choice" || status.history_choice !== "use-history") {
+    throw new Error("History extraction requires the recorded use-history choice");
+  }
+  const scan = historyScan();
+  if (!scan.eligible) {
+    throw new Error("History fast lane is unavailable because the local history is not eligible");
+  }
   const sessions = interactiveSessions().slice(-EXTRACT_SESSION_CAP);
   const transcripts = dedupeChunks(
     sessions.flatMap((s) =>
@@ -786,7 +856,8 @@ function usage() {
     ok: false,
     usage: [
       "init | doctor | status | enter | leave | session-end",
-      "checkpoint <stage> [safety-choice] | complete | select <direction> | select-from-pending",
+      "checkpoint <stage> [safety-choice] | history-choice <use-history|interview>",
+      "complete | select <direction> | select-from-pending",
       "request-reset | reset --confirm | portrait-clear --confirm",
       "evidence <type> [note] | guidance <adaptive|simpler|advanced>",
       "level <0..4> --confirm | hook-context",
@@ -817,6 +888,9 @@ async function main() {
         break;
       case "checkpoint":
         print(checkpoint(args[0], { safety_choice: args.slice(1).join(" ") || null }));
+        break;
+      case "history-choice":
+        print(recordHistoryChoice(args[0]));
         break;
       case "complete":
         print(complete());

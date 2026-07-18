@@ -99,7 +99,35 @@ function fixtureProjects(base) {
       "- bullet three",
     ].join("\n"),
   );
+
+  // Reserved-project memory is private noise too, not just its transcripts.
+  const reservedMemory = path.join(projects, "-", "memory");
+  fs.mkdirSync(reservedMemory, { recursive: true });
+  fs.writeFileSync(
+    path.join(reservedMemory, "never-ingest.md"),
+    "This reserved directory contains sk-test-reserved-memory and enough ordinary words to pass the memory paragraph filter if the exclusion regresses.\n",
+  );
   return projects;
+}
+
+function addEligibleHistory(projects) {
+  for (let s = 0; s < 5; s += 1) {
+    writeSession(
+      projects,
+      "-Users-eligible-history",
+      `eligible-${s}.jsonl`,
+      Array.from(
+        { length: 20 },
+        (_, i) => userLine(`eligible history message ${i} in session ${s} about a distinct project decision`),
+      ),
+    );
+  }
+}
+
+function chooseHistory(repo, env) {
+  run(repo, ["enter"], { env });
+  run(repo, ["checkpoint", "awaiting_history_choice"], { env });
+  return JSON.parse(run(repo, ["history-choice", "use-history"], { env }).stdout);
 }
 
 test("history-scan counts interactive sessions only and writes nothing", () => {
@@ -144,22 +172,25 @@ test("history-extract requires guided mode to be active", () => {
 test("history-extract writes a provenance-tagged, deduplicated corpus", () => {
   const repo = freshRepo();
   const projects = fixtureProjects(path.dirname(repo));
+  addEligibleHistory(projects);
   const env = { KICKSTART_PROJECTS_DIR: projects };
 
-  run(repo, ["enter"], { env });
+  const choice = chooseHistory(repo, env);
+  assert.equal(choice.choice, "use-history");
+  assert.equal(choice.status.history_choice, "use-history");
   const result = JSON.parse(run(repo, ["history-extract"], { env }).stdout);
   assert.equal(result.action, "history_extracted");
-  assert.equal(result.transcript_chunks, 7); // 8 usable minus 1 duplicate
+  assert.equal(result.transcript_chunks, 107); // 108 usable minus 1 duplicate
   assert.equal(result.memory_chunks, 1);
 
   const corpus = JSON.parse(
     fs.readFileSync(path.join(repo, "claude-kickstart/state/pro-corpus.json"), "utf8"),
   );
   assert.equal(corpus.schema_version, 1);
-  assert.equal(corpus.transcripts.length, 7);
+  assert.equal(corpus.transcripts.length, 107);
   for (const chunk of corpus.transcripts) {
     assert.equal(typeof chunk.text, "string");
-    assert.ok(chunk.project.startsWith("-Users-alice"));
+    assert.ok(chunk.project.startsWith("-Users-"));
     assert.ok(chunk.session.endsWith(".jsonl"));
     assert.ok(!chunk.text.includes("system-reminder"));
     assert.ok(!chunk.project.includes("/"));
@@ -172,6 +203,7 @@ test("history-extract writes a provenance-tagged, deduplicated corpus", () => {
   assert.ok(corpus.memory[0].text.startsWith("The user prefers short direct answers"));
   assert.equal(corpus.memory[0].source, "-Users-alice/memory/user_profile.md");
   assert.ok(!corpus.memory[0].text.includes("name: user-profile"));
+  assert.ok(!JSON.stringify(corpus).includes("sk-test-reserved-memory"));
 });
 
 test("awaiting_history_choice is a valid checkpoint stage", () => {
@@ -179,18 +211,57 @@ test("awaiting_history_choice is a valid checkpoint stage", () => {
   run(repo, ["enter"]);
   const result = JSON.parse(run(repo, ["checkpoint", "awaiting_history_choice"]).stdout);
   assert.equal(result.status.stage, "awaiting_history_choice");
+  assert.equal(result.status.history_choice, null);
+  run(repo, ["checkpoint", "awaiting_self_description"], { expectFailure: true });
   run(repo, ["checkpoint", "not_a_stage"], { expectFailure: true });
+});
+
+test("history extraction requires eligible, engine-recorded use-history consent", () => {
+  const repo = freshRepo();
+  const projects = fixtureProjects(path.dirname(repo));
+  const env = { KICKSTART_PROJECTS_DIR: projects };
+
+  run(repo, ["enter"], { env });
+  run(repo, ["history-extract"], { env, expectFailure: true });
+  run(repo, ["checkpoint", "awaiting_history_choice"], { env });
+  run(repo, ["history-extract"], { env, expectFailure: true });
+  run(repo, ["history-choice", "use-history"], { env, expectFailure: true });
+
+  addEligibleHistory(projects);
+  const choice = JSON.parse(run(repo, ["history-choice", "use-history"], { env }).stdout);
+  assert.equal(choice.status.history_choice, "use-history");
+  assert.equal(choice.status.stage, "awaiting_history_choice");
+  assert.equal(run(repo, ["history-extract"], { env }).status, 0);
+});
+
+test("interview choice is durable and mechanically blocks history extraction", () => {
+  const repo = freshRepo();
+  const projects = fixtureProjects(path.dirname(repo));
+  addEligibleHistory(projects);
+  const env = { KICKSTART_PROJECTS_DIR: projects };
+
+  run(repo, ["enter"], { env });
+  run(repo, ["checkpoint", "awaiting_history_choice"], { env });
+  const choice = JSON.parse(run(repo, ["history-choice", "interview"], { env }).stdout);
+  assert.equal(choice.status.history_choice, "interview");
+  assert.equal(choice.status.stage, "awaiting_self_description");
+  run(repo, ["history-extract"], { env, expectFailure: true });
+  assert.equal(
+    JSON.parse(run(repo, ["status"], { env }).stdout).status.history_choice,
+    "interview",
+  );
 });
 
 test("portrait-verify enforces verbatim quotes against the extracted corpus", () => {
   const repo = freshRepo();
   const projects = fixtureProjects(path.dirname(repo));
+  addEligibleHistory(projects);
   const env = { KICKSTART_PROJECTS_DIR: projects };
 
   // Requires a corpus first.
   run(repo, ["portrait-verify"], { env, expectFailure: true });
 
-  run(repo, ["enter"], { env });
+  chooseHistory(repo, env);
   run(repo, ["history-extract"], { env });
 
   const portrait = path.join(repo, "claude-kickstart/state/user-portrait.md");

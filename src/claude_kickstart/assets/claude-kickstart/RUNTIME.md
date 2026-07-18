@@ -25,6 +25,7 @@ Use Claude's Read/Edit file tools—not Bash, `cat`, heredocs, or shell redirect
 node claude-kickstart/bin/kickstart-state.mjs status
 node claude-kickstart/bin/kickstart-state.mjs enter
 node claude-kickstart/bin/kickstart-state.mjs checkpoint <stage> [safety-choice]
+node claude-kickstart/bin/kickstart-state.mjs history-choice <use-history|interview>
 node claude-kickstart/bin/kickstart-state.mjs complete
 node claude-kickstart/bin/kickstart-state.mjs select-from-pending
 node claude-kickstart/bin/kickstart-state.mjs history-scan

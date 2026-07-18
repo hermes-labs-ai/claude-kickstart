@@ -106,14 +106,18 @@ test("session end marks in-progress onboarding interrupted but keeps completed m
 test("reset requires confirmation and preserves creations", () => {
   const repo = freshRepo();
   const creation = path.join(repo, "claude-kickstart/creations/keep-me.txt");
+  const corpus = path.join(repo, "claude-kickstart/state/pro-corpus.json");
   fs.writeFileSync(creation, "user work\n");
+  fs.writeFileSync(corpus, '{"private":"corpus"}\n');
   run(repo, ["enter"]);
   run(repo, ["select", "A user direction"]);
   run(repo, ["request-reset"]);
   run(repo, ["reset"], { expectFailure: true });
   assert.equal(fs.readFileSync(creation, "utf8"), "user work\n");
-  run(repo, ["reset", "--confirm"]);
+  const result = JSON.parse(run(repo, ["reset", "--confirm"]).stdout);
   assert.equal(fs.readFileSync(creation, "utf8"), "user work\n");
+  assert.equal(fs.existsSync(corpus), false);
+  assert.equal(result.private_corpus_deleted, true);
   const status = json(repo, "claude-kickstart/state/status.json");
   assert.equal(status.reset_status, "completed");
   assert.equal(status.mode, "inactive");
@@ -123,13 +127,18 @@ test("portrait deletion requires confirmation and never deletes creations", () =
   const repo = freshRepo();
   const portrait = path.join(repo, "claude-kickstart/state/user-portrait.md");
   const creation = path.join(repo, "claude-kickstart/creations/artifact.md");
+  const corpus = path.join(repo, "claude-kickstart/state/pro-corpus.json");
   fs.writeFileSync(portrait, "private portrait\n");
   fs.writeFileSync(creation, "artifact\n");
+  fs.writeFileSync(corpus, '{"private":"corpus"}\n');
   run(repo, ["portrait-clear"], { expectFailure: true });
   assert.equal(fs.readFileSync(portrait, "utf8"), "private portrait\n");
-  run(repo, ["portrait-clear", "--confirm"]);
+  const result = JSON.parse(run(repo, ["portrait-clear", "--confirm"]).stdout);
   assert.match(fs.readFileSync(portrait, "utf8"), /Not collected yet/);
   assert.equal(fs.readFileSync(creation, "utf8"), "artifact\n");
+  assert.equal(fs.existsSync(corpus), false);
+  assert.equal(result.private_corpus_deleted, true);
+  assert.equal(result.status.history_choice, null);
 });
 
 test("malformed and missing state recover with an evidence backup", () => {
@@ -146,6 +155,24 @@ test("malformed and missing state recover with an evidence backup", () => {
   fs.rmSync(statusFile);
   run(repo, ["status"]);
   assert.equal(json(repo, "claude-kickstart/state/status.json").mode, "inactive");
+});
+
+test("status files from before history consent migrate without losing user state", () => {
+  const repo = freshRepo();
+  const statusFile = path.join(repo, "claude-kickstart/state/status.json");
+  run(repo, ["init"]);
+  const oldStatus = json(repo, "claude-kickstart/state/status.json");
+  delete oldStatus.history_choice;
+  oldStatus.selected_direction = "Preserve this direction";
+  fs.writeFileSync(statusFile, `${JSON.stringify(oldStatus, null, 2)}\n`);
+
+  const result = JSON.parse(run(repo, ["status"]).stdout);
+  assert.equal(result.status.history_choice, null);
+  assert.equal(result.status.selected_direction, "Preserve this direction");
+  assert.equal(
+    fs.readdirSync(path.dirname(statusFile)).some((name) => name.includes("status.json.corrupt-")),
+    false,
+  );
 });
 
 test("progression uses evidence and supports reversible user guidance", () => {
