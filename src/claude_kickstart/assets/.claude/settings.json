@@ -4,7 +4,10 @@
     "disableBypassPermissionsMode": "disable",
     "disableAutoMode": "disable",
     "allow": [
-      "Edit(claude-kickstart/state/**)",
+      "Edit(claude-kickstart/state/user-portrait.md)",
+      "Edit(claude-kickstart/state/possibility-history.md)",
+      "Edit(claude-kickstart/state/onboarding-notes.md)",
+      "Edit(claude-kickstart/state/pending-selection.md)",
       "Bash(node claude-kickstart/bin/kickstart-state.mjs init)",
       "Bash(node claude-kickstart/bin/kickstart-state.mjs doctor)",
       "Bash(node claude-kickstart/bin/kickstart-state.mjs status)",

@@ -77,7 +77,17 @@ test("project settings retain manual permissions and secret-file denials", () =>
   assert.equal(settings.permissions.defaultMode, "default");
   assert.equal(settings.permissions.disableBypassPermissionsMode, "disable");
   assert.ok(settings.permissions.ask.includes("WebFetch"));
-  assert.ok(settings.permissions.allow.includes("Edit(claude-kickstart/state/**)"));
+  assert.deepEqual(
+    settings.permissions.allow.filter((entry) => entry.startsWith("Edit(")),
+    [
+      "Edit(claude-kickstart/state/user-portrait.md)",
+      "Edit(claude-kickstart/state/possibility-history.md)",
+      "Edit(claude-kickstart/state/onboarding-notes.md)",
+      "Edit(claude-kickstart/state/pending-selection.md)",
+    ],
+  );
+  assert.ok(!settings.permissions.allow.some((entry) => entry.includes("status.json")));
+  assert.ok(!settings.permissions.allow.includes("Edit(claude-kickstart/state/**)"));
   assert.ok(settings.permissions.allow.includes("Bash(node claude-kickstart/bin/kickstart-state.mjs enter)"));
   assert.ok(settings.permissions.allow.includes("Bash(node claude-kickstart/bin/kickstart-state.mjs history-choice use-history)"));
   assert.ok(settings.permissions.allow.includes("Bash(node claude-kickstart/bin/kickstart-state.mjs history-choice interview)"));

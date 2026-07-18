@@ -240,11 +240,16 @@ test("interview choice is durable and mechanically blocks history extraction", (
   addEligibleHistory(projects);
   const env = { KICKSTART_PROJECTS_DIR: projects };
 
-  run(repo, ["enter"], { env });
-  run(repo, ["checkpoint", "awaiting_history_choice"], { env });
+  chooseHistory(repo, env);
+  run(repo, ["history-extract"], { env });
+  const corpus = path.join(repo, "claude-kickstart/state/pro-corpus.json");
+  assert.equal(fs.existsSync(corpus), true);
   const choice = JSON.parse(run(repo, ["history-choice", "interview"], { env }).stdout);
   assert.equal(choice.status.history_choice, "interview");
   assert.equal(choice.status.stage, "awaiting_self_description");
+  assert.equal(choice.private_corpus_deleted, true);
+  assert.equal(fs.existsSync(corpus), false);
+  run(repo, ["portrait-verify"], { env, expectFailure: true });
   run(repo, ["history-extract"], { env, expectFailure: true });
   run(repo, ["checkpoint", "awaiting_history_choice"], { env, expectFailure: true });
   run(repo, ["leave"], { env });

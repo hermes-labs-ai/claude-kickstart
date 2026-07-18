@@ -360,6 +360,7 @@ function recordHistoryChoice(choice) {
       throw new Error("History fast lane is unavailable because the local history is not eligible");
     }
   }
+  const corpusDeleted = choice === "interview" ? deleteProCorpus() : false;
   status.history_choice = choice;
   if (choice === "interview") status.stage = "awaiting_self_description";
   saveStatus(status, `history_choice:${choice}`);
@@ -368,6 +369,7 @@ function recordHistoryChoice(choice) {
     action: "history_choice_recorded",
     choice,
     next_stage: status.stage,
+    private_corpus_deleted: corpusDeleted,
     status,
   };
 }
