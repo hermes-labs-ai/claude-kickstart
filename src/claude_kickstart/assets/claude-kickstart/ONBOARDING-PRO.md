@@ -59,6 +59,18 @@ the same six sections as the interviewed portrait. Non-negotiable rules:
 - **Honest thinness.** If a section has no real support in the corpus, say so in the
   portrait instead of padding it.
 
+After writing the portrait, run the mechanical check — the rules above are enforced,
+not trusted:
+
+```text
+node claude-kickstart/bin/kickstart-state.mjs portrait-verify
+```
+
+It checks every quoted span in the portrait against the extracted corpus and fails if
+any quote is not verbatim corpus text. Fix each reported quote — restore the exact
+original, remove it, or mark its line `(lightly edited)` — and re-run until it passes.
+Never show the user an unverified portrait.
+
 Then checkpoint `awaiting_portrait_confirmation` and follow `ONBOARDING.md` from there,
 with one adaptation: a derived portrait is bigger than an interviewed one, so walk the
 confirmation section by section — facts first, then inferences — and invite corrections

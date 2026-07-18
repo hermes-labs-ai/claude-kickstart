@@ -646,6 +646,62 @@ function historyExtract() {
   };
 }
 
+// Mechanical check for the derived-portrait synthesis contract: every quoted
+// span in the portrait must exist verbatim in the extracted corpus. Prose rules
+// alone are skippable; this gate is not. Catches fabricated quotes, silently
+// cleaned-up quotes, and facts that leaked in from outside the corpus.
+function portraitVerify() {
+  if (!fs.existsSync(PRO_CORPUS_FILE)) {
+    throw new Error("No derived corpus found: run history-extract before portrait-verify");
+  }
+  if (!fs.existsSync(PORTRAIT_FILE)) {
+    throw new Error("No portrait found: write state/user-portrait.md before portrait-verify");
+  }
+  const corpus = JSON.parse(fs.readFileSync(PRO_CORPUS_FILE, "utf8"));
+  const haystack = [...(corpus.transcripts || []), ...(corpus.memory || [])].map((c) =>
+    c.text.toLowerCase(),
+  );
+  const lines = fs.readFileSync(PORTRAIT_FILE, "utf8").split("\n");
+  let checked = 0;
+  let markedEdited = 0;
+  const unverified = [];
+  lines.forEach((line, index) => {
+    // Directional curly pairs are unambiguous; straight quotes pair by
+    // alternation (odd split segments are the quoted spans). Matching the raw
+    // regex /"..."/ instead would capture the text BETWEEN two quotations on
+    // lines that quote more than once.
+    const spans = [];
+    for (const match of line.matchAll(/“([^“”]+)”/g)) spans.push(match[1]);
+    const straight = line.replace(/“[^“”]+”/g, "").split('"');
+    for (let i = 1; i < straight.length; i += 2) spans.push(straight[i]);
+    for (const span of spans) {
+      if (span.length < 15) continue;
+      checked += 1;
+      if (/lightly edited/i.test(line)) {
+        markedEdited += 1;
+        continue;
+      }
+      // Quotation convention allows one terminal punctuation mark; everything
+      // else must be verbatim corpus text.
+      const needle = span.toLowerCase().replace(/[.?!,…]$/, "");
+      if (!haystack.some((text) => text.includes(needle))) {
+        unverified.push({ line: index + 1, quote: span.slice(0, 120) });
+      }
+    }
+  });
+  return {
+    ok: unverified.length === 0,
+    action: "portrait_verified",
+    quotes_checked: checked,
+    verified: checked - markedEdited - unverified.length,
+    marked_edited: markedEdited,
+    unverified,
+    rule:
+      "Every unverified quote must be corrected to the verbatim corpus text, removed, " +
+      "or explicitly marked (lightly edited) on its line before the portrait is confirmed.",
+  };
+}
+
 function doctor() {
   const required = [
     path.join(ROOT, ".claude", "commands", "kickstart.md"),
@@ -734,7 +790,7 @@ function usage() {
       "request-reset | reset --confirm | portrait-clear --confirm",
       "evidence <type> [note] | guidance <adaptive|simpler|advanced>",
       "level <0..4> --confirm | hook-context",
-      "history-scan | history-extract",
+      "history-scan | history-extract | portrait-verify",
     ],
   };
 }
@@ -809,6 +865,12 @@ async function main() {
       case "history-extract":
         print(historyExtract());
         break;
+      case "portrait-verify": {
+        const result = portraitVerify();
+        print(result);
+        if (!result.ok) process.exitCode = 1;
+        break;
+      }
       default:
         print(usage());
         process.exitCode = 1;

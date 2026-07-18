@@ -29,6 +29,7 @@ node claude-kickstart/bin/kickstart-state.mjs complete
 node claude-kickstart/bin/kickstart-state.mjs select-from-pending
 node claude-kickstart/bin/kickstart-state.mjs history-scan
 node claude-kickstart/bin/kickstart-state.mjs history-extract
+node claude-kickstart/bin/kickstart-state.mjs portrait-verify
 node claude-kickstart/bin/kickstart-state.mjs leave
 ```
 

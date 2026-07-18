@@ -182,6 +182,50 @@ test("awaiting_history_choice is a valid checkpoint stage", () => {
   run(repo, ["checkpoint", "not_a_stage"], { expectFailure: true });
 });
 
+test("portrait-verify enforces verbatim quotes against the extracted corpus", () => {
+  const repo = freshRepo();
+  const projects = fixtureProjects(path.dirname(repo));
+  const env = { KICKSTART_PROJECTS_DIR: projects };
+
+  // Requires a corpus first.
+  run(repo, ["portrait-verify"], { env, expectFailure: true });
+
+  run(repo, ["enter"], { env });
+  run(repo, ["history-extract"], { env });
+
+  const portrait = path.join(repo, "claude-kickstart/state/user-portrait.md");
+  fs.writeFileSync(
+    portrait,
+    [
+      "# User Portrait",
+      '- You said "actually rename that helper to sessionGuard instead" (aaaa.jsonl)', // verbatim
+      '- You said "please rename that helper to sessionGuard" (lightly edited)', // marked, exempt
+      '- You said "I have been shipping compilers since 1987" (aaaa.jsonl)', // fabricated
+      '- Short quote "tiny" is ignored.', // under 15 chars, not counted
+    ].join("\n"),
+  );
+  const failing = run(repo, ["portrait-verify"], { env, expectFailure: true });
+  const report = JSON.parse(failing.stdout);
+  assert.equal(report.ok, false);
+  assert.equal(report.quotes_checked, 3);
+  assert.equal(report.verified, 1);
+  assert.equal(report.marked_edited, 1);
+  assert.equal(report.unverified.length, 1);
+  assert.ok(report.unverified[0].quote.includes("compilers since 1987"));
+
+  // Removing the fabricated line makes it pass.
+  fs.writeFileSync(
+    portrait,
+    [
+      "# User Portrait",
+      '- You said "actually rename that helper to sessionGuard instead" (aaaa.jsonl)',
+    ].join("\n"),
+  );
+  const passing = JSON.parse(run(repo, ["portrait-verify"], { env }).stdout);
+  assert.equal(passing.ok, true);
+  assert.equal(passing.verified, 1);
+});
+
 test("history-scan handles a missing projects directory gracefully", () => {
   const repo = freshRepo();
   const scan = JSON.parse(

@@ -17,6 +17,7 @@
       "Bash(node claude-kickstart/bin/kickstart-state.mjs checkpoint awaiting_history_choice)",
       "Bash(node claude-kickstart/bin/kickstart-state.mjs history-scan)",
       "Bash(node claude-kickstart/bin/kickstart-state.mjs history-extract)",
+      "Bash(node claude-kickstart/bin/kickstart-state.mjs portrait-verify)",
       "Bash(node claude-kickstart/bin/kickstart-state.mjs checkpoint awaiting_followup_1)",
       "Bash(node claude-kickstart/bin/kickstart-state.mjs checkpoint awaiting_followup_2)",
       "Bash(node claude-kickstart/bin/kickstart-state.mjs checkpoint awaiting_followup_3)",
