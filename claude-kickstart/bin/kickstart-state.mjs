@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -16,6 +17,10 @@ const PORTRAIT_FILE = path.join(STATE_DIR, "user-portrait.md");
 const HISTORY_FILE = path.join(STATE_DIR, "possibility-history.md");
 const NOTES_FILE = path.join(STATE_DIR, "onboarding-notes.md");
 const PENDING_SELECTION_FILE = path.join(STATE_DIR, "pending-selection.md");
+const PRO_CORPUS_FILE = path.join(STATE_DIR, "pro-corpus.json");
+const PROJECTS_DIR = process.env.KICKSTART_PROJECTS_DIR
+  ? path.resolve(process.env.KICKSTART_PROJECTS_DIR)
+  : path.join(os.homedir(), ".claude", "projects");
 
 const ONBOARDING_STATES = new Set([
   "not_started",
@@ -27,6 +32,7 @@ const MODES = new Set(["active", "inactive"]);
 const STAGES = new Set([
   "welcome",
   "awaiting_safety",
+  "awaiting_history_choice",
   "awaiting_self_description",
   "awaiting_followup_1",
   "awaiting_followup_2",
@@ -46,6 +52,7 @@ const EVIDENCE_TYPES = new Set([
   "asked_underlying_mechanism",
 ]);
 const GUIDANCE_PREFERENCES = new Set(["adaptive", "simpler", "advanced"]);
+const HISTORY_CHOICES = new Set([null, "use-history", "interview"]);
 
 function now() {
   return new Date().toISOString();
@@ -64,6 +71,7 @@ function defaultStatus() {
     stage: "welcome",
     reset_status: "none",
     safety_choice: null,
+    history_choice: null,
     selected_direction: null,
     interruption_count: 0,
     last_event: "initialized",
@@ -199,6 +207,13 @@ function validateStatus(value) {
   if (!Number.isInteger(value.interruption_count) || value.interruption_count < 0) {
     throw new Error("invalid interruption count");
   }
+  // Status files created before the existing-history lane did not carry this
+  // field. Treat them as having made no choice rather than corrupting/replacing
+  // otherwise valid user state.
+  if (value.history_choice === undefined) value.history_choice = null;
+  if (!HISTORY_CHOICES.has(value.history_choice)) {
+    throw new Error(`invalid history choice: ${value.history_choice}`);
+  }
   return value;
 }
 
@@ -310,11 +325,53 @@ function checkpoint(stage, extra = {}) {
   if (!STAGES.has(stage)) throw new Error(`Unknown checkpoint stage: ${stage}`);
   const status = loadStatus();
   if (status.mode !== "active") throw new Error("Enter Claude Kickstart before checkpointing onboarding");
+  if (stage === "awaiting_history_choice" && status.history_choice === "interview") {
+    throw new Error("History was declined; reset or delete the portrait before reopening the fast lane");
+  }
   status.onboarding_status = "in_progress";
+  if (
+    status.stage === "awaiting_history_choice" &&
+    stage !== "awaiting_history_choice" &&
+    status.history_choice === null
+  ) {
+    throw new Error("Record the history choice before leaving awaiting_history_choice");
+  }
   status.stage = stage;
+  if (stage === "awaiting_history_choice") status.history_choice = null;
   if (extra.safety_choice) status.safety_choice = extra.safety_choice;
   saveStatus(status, `checkpoint:${stage}`);
   return { ok: true, action: "checkpoint", stage, status };
+}
+
+function recordHistoryChoice(choice) {
+  if (!HISTORY_CHOICES.has(choice) || choice === null) {
+    throw new Error("History choice must be use-history or interview");
+  }
+  const status = loadStatus();
+  if (status.mode !== "active") {
+    throw new Error("Enter Claude Kickstart before recording the history choice");
+  }
+  if (status.stage !== "awaiting_history_choice") {
+    throw new Error("History choice is only valid at awaiting_history_choice");
+  }
+  if (choice === "use-history") {
+    const scan = historyScan();
+    if (!scan.eligible) {
+      throw new Error("History fast lane is unavailable because the local history is not eligible");
+    }
+  }
+  const corpusDeleted = choice === "interview" ? deleteProCorpus() : false;
+  status.history_choice = choice;
+  if (choice === "interview") status.stage = "awaiting_self_description";
+  saveStatus(status, `history_choice:${choice}`);
+  return {
+    ok: true,
+    action: "history_choice_recorded",
+    choice,
+    next_stage: status.stage,
+    private_corpus_deleted: corpusDeleted,
+    status,
+  };
 }
 
 function complete() {
@@ -362,6 +419,7 @@ function requestReset() {
 }
 
 function resetConfirmed() {
+  const corpusDeleted = deleteProCorpus();
   const previous = loadStatus();
   const reset = defaultStatus();
   reset.reset_status = "completed";
@@ -378,11 +436,13 @@ function resetConfirmed() {
     ok: true,
     action: "reset",
     preserved: ["claude-kickstart/creations/"],
+    private_corpus_deleted: corpusDeleted,
     status: reset,
   };
 }
 
 function clearPortrait() {
+  const corpusDeleted = deleteProCorpus();
   const status = loadStatus();
   atomicWrite(PORTRAIT_FILE, PORTRAIT_TEMPLATE);
   atomicWrite(NOTES_FILE, NOTES_TEMPLATE);
@@ -393,8 +453,15 @@ function clearPortrait() {
     status.onboarding_status = "not_started";
     status.stage = "welcome";
   }
+  status.history_choice = null;
   saveStatus(status, "portrait_deleted");
-  return { ok: true, action: "portrait_deleted", creations_preserved: true, status };
+  return {
+    ok: true,
+    action: "portrait_deleted",
+    creations_preserved: true,
+    private_corpus_deleted: corpusDeleted,
+    status,
+  };
 }
 
 function selectDirection(text) {
@@ -465,6 +532,249 @@ function setLevel(level) {
   learning.stage = parsed;
   saveLearning(learning);
   return { ok: true, action: "level_updated", learning };
+}
+
+// --- Existing-history fast lane (pro) -------------------------------------
+// Detection and extraction over the user's own local Claude Code transcripts
+// (~/.claude/projects). Everything stays on this machine: `history-scan`
+// writes nothing and returns counts only; `history-extract` writes to the
+// gitignored state directory. A session counts as interactive only when it
+// holds >= 3 usable typed messages — headless or automated sessions carry a
+// single synthetic prompt and must not masquerade as the user's voice.
+
+const MIN_INTERACTIVE_MESSAGES = 3;
+const ELIGIBLE_MIN_SESSIONS = 5;
+const ELIGIBLE_MIN_MESSAGES = 100;
+const EXTRACT_SESSION_CAP = 80;
+const MEMORY_CHUNK_CAP = 120;
+
+function deleteProCorpus() {
+  if (!fs.existsSync(PRO_CORPUS_FILE)) return false;
+  assertLocalPath(PRO_CORPUS_FILE);
+  fs.unlinkSync(PRO_CORPUS_FILE);
+  return true;
+}
+
+function usableUserMessages(file) {
+  const messages = [];
+  let lines;
+  try {
+    lines = fs.readFileSync(file, "utf8").split("\n");
+  } catch {
+    return messages;
+  }
+  for (const line of lines) {
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!entry || entry.type !== "user") continue;
+    const content = entry.message?.content;
+    if (typeof content !== "string") continue;
+    const text = content.trim();
+    if (text.length < 15 || text.length > 500) continue;
+    if (text.startsWith("<") || text.startsWith("[") || text.startsWith("{")) continue;
+    if (text.toLowerCase().includes("system-reminder")) continue;
+    if (text.includes("<bash-") || text.includes("<tool_") || text.includes("<command-name>")) continue;
+    messages.push(text);
+  }
+  return messages;
+}
+
+function interactiveSessions() {
+  const sessions = [];
+  if (!fs.existsSync(PROJECTS_DIR)) return sessions;
+  for (const project of fs.readdirSync(PROJECTS_DIR, { withFileTypes: true })) {
+    if (!project.isDirectory() || project.name === "-") continue;
+    const projectDir = path.join(PROJECTS_DIR, project.name);
+    let files;
+    try {
+      files = fs.readdirSync(projectDir);
+    } catch {
+      continue;
+    }
+    for (const name of files) {
+      if (!name.endsWith(".jsonl")) continue;
+      const file = path.join(projectDir, name);
+      let mtime;
+      try {
+        mtime = fs.statSync(file).mtimeMs;
+      } catch {
+        continue;
+      }
+      const messages = usableUserMessages(file);
+      if (messages.length >= MIN_INTERACTIVE_MESSAGES) {
+        sessions.push({ project: project.name, session: name, mtime, messages });
+      }
+    }
+  }
+  sessions.sort((a, b) => a.mtime - b.mtime);
+  return sessions;
+}
+
+function historyStats(sessions) {
+  return {
+    projects_dir: PROJECTS_DIR,
+    interactive_sessions: sessions.length,
+    usable_messages: sessions.reduce((sum, s) => sum + s.messages.length, 0),
+  };
+}
+
+function historyScan() {
+  const stats = historyStats(interactiveSessions());
+  const eligible =
+    stats.interactive_sessions >= ELIGIBLE_MIN_SESSIONS &&
+    stats.usable_messages >= ELIGIBLE_MIN_MESSAGES;
+  return { ok: true, action: "history_scan", ...stats, eligible, wrote: "nothing" };
+}
+
+function dedupeChunks(chunks) {
+  const seen = new Set();
+  const unique = [];
+  for (const chunk of chunks) {
+    const key = chunk.text.slice(0, 80).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(chunk);
+  }
+  return unique;
+}
+
+function memoryChunks() {
+  const chunks = [];
+  if (!fs.existsSync(PROJECTS_DIR)) return chunks;
+  for (const project of fs.readdirSync(PROJECTS_DIR, { withFileTypes: true })) {
+    if (chunks.length >= MEMORY_CHUNK_CAP) break;
+    if (!project.isDirectory() || project.name === "-") continue;
+    const memoryDir = path.join(PROJECTS_DIR, project.name, "memory");
+    if (!fs.existsSync(memoryDir)) continue;
+    for (const name of fs.readdirSync(memoryDir).sort()) {
+      if (chunks.length >= MEMORY_CHUNK_CAP) break;
+      if (!name.endsWith(".md")) continue;
+      let text;
+      try {
+        text = fs.readFileSync(path.join(memoryDir, name), "utf8");
+      } catch {
+        continue;
+      }
+      if (text.startsWith("---")) {
+        const end = text.indexOf("---", 4);
+        if (end > 0) text = text.slice(end + 3).trim();
+      }
+      for (const paragraph of text.split("\n\n")) {
+        if (chunks.length >= MEMORY_CHUNK_CAP) break;
+        const trimmed = paragraph.trim();
+        if (!trimmed) continue;
+        const lines = trimmed.split("\n");
+        const listLines = lines.filter((l) => /^\s*([-*#]|\d+\.)/.test(l)).length;
+        if (lines.length > 2 && listLines / lines.length > 0.5) continue;
+        const words = trimmed.split(/\s+/).length;
+        if (words >= 15 && words <= 120) {
+          chunks.push({ text: trimmed, source: `${project.name}/memory/${name}` });
+        }
+      }
+    }
+  }
+  return chunks;
+}
+
+function historyExtract() {
+  const status = loadStatus();
+  if (status.mode !== "active") throw new Error("Enter Claude Kickstart before extracting history");
+  if (status.stage !== "awaiting_history_choice" || status.history_choice !== "use-history") {
+    throw new Error("History extraction requires the recorded use-history choice");
+  }
+  const scan = historyScan();
+  if (!scan.eligible) {
+    throw new Error("History fast lane is unavailable because the local history is not eligible");
+  }
+  const sessions = interactiveSessions().slice(-EXTRACT_SESSION_CAP);
+  const transcripts = dedupeChunks(
+    sessions.flatMap((s) =>
+      s.messages.map((text) => ({ text, project: s.project, session: s.session })),
+    ),
+  );
+  const memory = dedupeChunks(memoryChunks());
+  const stats = {
+    ...historyStats(sessions),
+    transcript_chunks: transcripts.length,
+    memory_chunks: memory.length,
+  };
+  writeJson(PRO_CORPUS_FILE, {
+    schema_version: 1,
+    generated_at: now(),
+    note:
+      "Local extraction of the user's own Claude Code history for portrait synthesis. " +
+      "Transcript chunks are firsthand (typed by the user). Memory chunks are secondhand " +
+      "(assistant-authored notes) and may support inferences but never facts.",
+    stats,
+    transcripts,
+    memory,
+  });
+  return {
+    ok: true,
+    action: "history_extracted",
+    ...stats,
+    corpus_file: path.relative(ROOT, PRO_CORPUS_FILE),
+  };
+}
+
+// Mechanical check for the derived-portrait synthesis contract: every quoted
+// span in the portrait must exist verbatim in the extracted corpus. Prose rules
+// alone are skippable; this gate is not. Catches fabricated quotes, silently
+// cleaned-up quotes, and facts that leaked in from outside the corpus.
+function portraitVerify() {
+  if (!fs.existsSync(PRO_CORPUS_FILE)) {
+    throw new Error("No derived corpus found: run history-extract before portrait-verify");
+  }
+  if (!fs.existsSync(PORTRAIT_FILE)) {
+    throw new Error("No portrait found: write state/user-portrait.md before portrait-verify");
+  }
+  const corpus = JSON.parse(fs.readFileSync(PRO_CORPUS_FILE, "utf8"));
+  const haystack = [...(corpus.transcripts || []), ...(corpus.memory || [])].map((c) =>
+    c.text.toLowerCase(),
+  );
+  const lines = fs.readFileSync(PORTRAIT_FILE, "utf8").split("\n");
+  let checked = 0;
+  let markedEdited = 0;
+  const unverified = [];
+  lines.forEach((line, index) => {
+    // Directional curly pairs are unambiguous; straight quotes pair by
+    // alternation (odd split segments are the quoted spans). Matching the raw
+    // regex /"..."/ instead would capture the text BETWEEN two quotations on
+    // lines that quote more than once.
+    const spans = [];
+    for (const match of line.matchAll(/“([^“”]+)”/g)) spans.push(match[1]);
+    const straight = line.replace(/“[^“”]+”/g, "").split('"');
+    for (let i = 1; i < straight.length; i += 2) spans.push(straight[i]);
+    for (const span of spans) {
+      if (span.length < 15) continue;
+      checked += 1;
+      if (/lightly edited/i.test(line)) {
+        markedEdited += 1;
+        continue;
+      }
+      // Quotation convention allows one terminal punctuation mark; everything
+      // else must be verbatim corpus text.
+      const needle = span.toLowerCase().replace(/[.?!,…]$/, "");
+      if (!haystack.some((text) => text.includes(needle))) {
+        unverified.push({ line: index + 1, quote: span.slice(0, 120) });
+      }
+    }
+  });
+  return {
+    ok: unverified.length === 0,
+    action: "portrait_verified",
+    quotes_checked: checked,
+    verified: checked - markedEdited - unverified.length,
+    marked_edited: markedEdited,
+    unverified,
+    rule:
+      "Every unverified quote must be corrected to the verbatim corpus text, removed, " +
+      "or explicitly marked (lightly edited) on its line before the portrait is confirmed.",
+  };
 }
 
 function doctor() {
@@ -551,10 +861,12 @@ function usage() {
     ok: false,
     usage: [
       "init | doctor | status | enter | leave | session-end",
-      "checkpoint <stage> [safety-choice] | complete | select <direction> | select-from-pending",
+      "checkpoint <stage> [safety-choice] | history-choice <use-history|interview>",
+      "complete | select <direction> | select-from-pending",
       "request-reset | reset --confirm | portrait-clear --confirm",
       "evidence <type> [note] | guidance <adaptive|simpler|advanced>",
       "level <0..4> --confirm | hook-context",
+      "history-scan | history-extract | portrait-verify",
     ],
   };
 }
@@ -581,6 +893,9 @@ async function main() {
         break;
       case "checkpoint":
         print(checkpoint(args[0], { safety_choice: args.slice(1).join(" ") || null }));
+        break;
+      case "history-choice":
+        print(recordHistoryChoice(args[0]));
         break;
       case "complete":
         print(complete());
@@ -623,6 +938,18 @@ async function main() {
       case "hook-context":
         hookContext();
         break;
+      case "history-scan":
+        print(historyScan());
+        break;
+      case "history-extract":
+        print(historyExtract());
+        break;
+      case "portrait-verify": {
+        const result = portraitVerify();
+        print(result);
+        if (!result.ok) process.exitCode = 1;
+        break;
+      }
       default:
         print(usage());
         process.exitCode = 1;

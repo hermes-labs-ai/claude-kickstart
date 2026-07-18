@@ -77,10 +77,47 @@ test("project settings retain manual permissions and secret-file denials", () =>
   assert.equal(settings.permissions.defaultMode, "default");
   assert.equal(settings.permissions.disableBypassPermissionsMode, "disable");
   assert.ok(settings.permissions.ask.includes("WebFetch"));
-  assert.ok(settings.permissions.allow.includes("Edit(claude-kickstart/state/**)"));
+  assert.deepEqual(
+    settings.permissions.allow.filter((entry) => entry.startsWith("Edit(")),
+    [
+      "Edit(claude-kickstart/state/user-portrait.md)",
+      "Edit(claude-kickstart/state/possibility-history.md)",
+      "Edit(claude-kickstart/state/onboarding-notes.md)",
+      "Edit(claude-kickstart/state/pending-selection.md)",
+    ],
+  );
+  assert.ok(!settings.permissions.allow.some((entry) => entry.includes("status.json")));
+  assert.ok(!settings.permissions.allow.includes("Edit(claude-kickstart/state/**)"));
   assert.ok(settings.permissions.allow.includes("Bash(node claude-kickstart/bin/kickstart-state.mjs enter)"));
+  assert.ok(settings.permissions.allow.includes("Bash(node claude-kickstart/bin/kickstart-state.mjs history-choice use-history)"));
+  assert.ok(settings.permissions.allow.includes("Bash(node claude-kickstart/bin/kickstart-state.mjs history-choice interview)"));
   assert.ok(settings.permissions.deny.includes("Read(~/.ssh/**)"));
   assert.ok(settings.permissions.deny.includes("Edit(**/.env.*)"));
   assert.ok(settings.hooks.SessionStart);
   assert.ok(settings.hooks.SessionEnd);
+});
+
+test("public privacy surface binds consent, decline, and private-corpus deletion", () => {
+  const readme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
+  const runtime = fs.readFileSync(path.join(ROOT, "claude-kickstart/RUNTIME.md"), "utf8");
+  const pro = fs.readFileSync(path.join(ROOT, "claude-kickstart/ONBOARDING-PRO.md"), "utf8");
+  const packagedPro = fs.readFileSync(
+    path.join(ROOT, "src/claude_kickstart/assets/claude-kickstart/ONBOARDING-PRO.md"),
+    "utf8",
+  );
+  const historyInterviewCommand =
+    "`node claude-kickstart/bin/kickstart-state.mjs history-choice interview`";
+  assert.match(readme, /counts-only eligibility scan/i);
+  assert.match(readme, /parses candidate transcript messages but writes nothing and returns no content/i);
+  assert.match(readme, /extracts eligible transcripts and memory into a private corpus only after an engine-recorded choice/i);
+  assert.match(readme, /choosing the interview mechanically blocks extraction/i);
+  assert.match(readme, /deleted with either “Delete my portrait” or reset/i);
+  assert.match(runtime, /history-choice <use-history\|interview>/);
+  assert.equal(pro, packagedPro);
+  for (const onboardingPro of [pro, packagedPro]) {
+    assert.ok(onboardingPro.includes(historyInterviewCommand));
+    assert.equal(onboardingPro.includes("`history-choice interview`"), false);
+  }
+  assert.match(pro, /history-choice use-history/);
+  assert.match(pro, /Extraction rechecks both that recorded consent and current eligibility/);
 });

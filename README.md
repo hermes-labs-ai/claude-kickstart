@@ -75,13 +75,14 @@ Your portrait is plain Markdown in `claude-kickstart/state/user-portrait.md`. At
 - “Use simpler guidance.”
 - “Let me take more control.”
 
-Deletion and reset require confirmation. Reset preserves everything in `claude-kickstart/creations/`.
+Deletion and reset require confirmation. Both delete the private extracted-history corpus;
+reset preserves everything in `claude-kickstart/creations/`.
 
 ## Safety and privacy
 
 Claude Kickstart stays inside this project by default. It does not change your global Claude settings, inspect unrelated personal files, read common credential files, bypass permissions, or publish anything for you. Consequential actions still require an explanation and your approval.
 
-Your portrait, interview notes, progress state, and creations remain local files in the project. They are ignored by Git so they are not accidentally committed. You can read, edit, or delete them.
+Your portrait, interview notes, progress state, and creations remain local files in the project. After the safety stage, the optional existing-history fast lane performs a local counts-only eligibility scan: it parses candidate transcript messages but writes nothing and returns no content. It extracts eligible transcripts and memory into a private corpus only after an engine-recorded choice; choosing the interview mechanically blocks extraction. That corpus stays in the project and is deleted with either “Delete my portrait” or reset. These state files are ignored by Git so they are not accidentally committed. You can read, edit, or delete them.
 
 This is defense in depth, not an operating-system sandbox. Always read Claude Code's permission prompts before approving them.
 
