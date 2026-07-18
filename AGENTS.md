@@ -1,5 +1,10 @@
 # Instructions for the agent installing Claude Kickstart
 
+*Claude Kickstart is a [Hermes Labs](https://hermes-labs.ai) project — Epistemic Engineering:
+the model is the substrate, language is the operations layer. This file is that principle
+applied to installation: the install contract lives in language the installing agent reads,
+not in a prompt the user must carry.*
+
 You are reading this because a user — likely brand-new to Claude Code and possibly to
 terminals entirely — asked you to get Claude Kickstart for them. The enforcement that used
 to live in a long paste-prompt lives here instead. Follow it exactly; the user should never

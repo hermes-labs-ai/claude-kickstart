@@ -132,6 +132,15 @@ Claude Kickstart is a small stateful harness, not a personality quiz or a single
 
 See [DEMO.md](DEMO.md) for a ten-minute friend demo and [DEVELOPMENT.md](DEVELOPMENT.md) for architecture and test commands.
 
+## About
+
+Claude Kickstart is built by [Hermes Labs](https://hermes-labs.ai) — a research practice in
+**Epistemic Engineering**: engineering AI reliability at the language operations layer, not at the model substrate. The position:
+**the model is the substrate**, but **language is the operations layer** — where deployed
+reliability is won or lost. Kickstart is the newcomer-facing end of that work: **linguistic
+infrastructure** that lets a person who has never touched a terminal direct an AI agent
+safely, in their own words.
+
 ## License
 
 [MIT](LICENSE)
