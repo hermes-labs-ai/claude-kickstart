@@ -27,6 +27,8 @@ node claude-kickstart/bin/kickstart-state.mjs enter
 node claude-kickstart/bin/kickstart-state.mjs checkpoint <stage> [safety-choice]
 node claude-kickstart/bin/kickstart-state.mjs complete
 node claude-kickstart/bin/kickstart-state.mjs select-from-pending
+node claude-kickstart/bin/kickstart-state.mjs history-scan
+node claude-kickstart/bin/kickstart-state.mjs history-extract
 node claude-kickstart/bin/kickstart-state.mjs leave
 ```
 
@@ -36,7 +38,7 @@ Checkpoint before every user-facing onboarding question so an interruption can r
 
 Read `claude-kickstart/ONBOARDING.md` whenever onboarding is not complete. It is the authoritative stage-by-stage interview flow.
 
-- `first_run`: welcome the user, then continue at `awaiting_safety`.
+- `first_run`: welcome the user, then continue at `awaiting_safety`. After the safety choice is saved, run `history-scan`; if it reports `eligible: true`, follow `claude-kickstart/ONBOARDING-PRO.md` (the existing-history fast lane) before starting the self-description interview. Otherwise say nothing about the fast lane.
 - `resume_onboarding`: say what was preserved in one sentence, read onboarding notes, and continue at the saved stage. Do not restart.
 - `returning_user`: read the portrait and recent possibility history; welcome the user back with one personally relevant invitation.
 - `already_active`: continue naturally from the current state; do not repeat onboarding.

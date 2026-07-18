@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -16,6 +17,10 @@ const PORTRAIT_FILE = path.join(STATE_DIR, "user-portrait.md");
 const HISTORY_FILE = path.join(STATE_DIR, "possibility-history.md");
 const NOTES_FILE = path.join(STATE_DIR, "onboarding-notes.md");
 const PENDING_SELECTION_FILE = path.join(STATE_DIR, "pending-selection.md");
+const PRO_CORPUS_FILE = path.join(STATE_DIR, "pro-corpus.json");
+const PROJECTS_DIR = process.env.KICKSTART_PROJECTS_DIR
+  ? path.resolve(process.env.KICKSTART_PROJECTS_DIR)
+  : path.join(os.homedir(), ".claude", "projects");
 
 const ONBOARDING_STATES = new Set([
   "not_started",
@@ -27,6 +32,7 @@ const MODES = new Set(["active", "inactive"]);
 const STAGES = new Set([
   "welcome",
   "awaiting_safety",
+  "awaiting_history_choice",
   "awaiting_self_description",
   "awaiting_followup_1",
   "awaiting_followup_2",
@@ -467,6 +473,179 @@ function setLevel(level) {
   return { ok: true, action: "level_updated", learning };
 }
 
+// --- Existing-history fast lane (pro) -------------------------------------
+// Detection and extraction over the user's own local Claude Code transcripts
+// (~/.claude/projects). Everything stays on this machine: `history-scan`
+// writes nothing and returns counts only; `history-extract` writes to the
+// gitignored state directory. A session counts as interactive only when it
+// holds >= 3 usable typed messages — headless or automated sessions carry a
+// single synthetic prompt and must not masquerade as the user's voice.
+
+const MIN_INTERACTIVE_MESSAGES = 3;
+const ELIGIBLE_MIN_SESSIONS = 5;
+const ELIGIBLE_MIN_MESSAGES = 100;
+const EXTRACT_SESSION_CAP = 80;
+const MEMORY_CHUNK_CAP = 120;
+
+function usableUserMessages(file) {
+  const messages = [];
+  let lines;
+  try {
+    lines = fs.readFileSync(file, "utf8").split("\n");
+  } catch {
+    return messages;
+  }
+  for (const line of lines) {
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!entry || entry.type !== "user") continue;
+    const content = entry.message?.content;
+    if (typeof content !== "string") continue;
+    const text = content.trim();
+    if (text.length < 15 || text.length > 500) continue;
+    if (text.startsWith("<") || text.startsWith("[") || text.startsWith("{")) continue;
+    if (text.toLowerCase().includes("system-reminder")) continue;
+    if (text.includes("<bash-") || text.includes("<tool_") || text.includes("<command-name>")) continue;
+    messages.push(text);
+  }
+  return messages;
+}
+
+function interactiveSessions() {
+  const sessions = [];
+  if (!fs.existsSync(PROJECTS_DIR)) return sessions;
+  for (const project of fs.readdirSync(PROJECTS_DIR, { withFileTypes: true })) {
+    if (!project.isDirectory() || project.name === "-") continue;
+    const projectDir = path.join(PROJECTS_DIR, project.name);
+    let files;
+    try {
+      files = fs.readdirSync(projectDir);
+    } catch {
+      continue;
+    }
+    for (const name of files) {
+      if (!name.endsWith(".jsonl")) continue;
+      const file = path.join(projectDir, name);
+      let mtime;
+      try {
+        mtime = fs.statSync(file).mtimeMs;
+      } catch {
+        continue;
+      }
+      const messages = usableUserMessages(file);
+      if (messages.length >= MIN_INTERACTIVE_MESSAGES) {
+        sessions.push({ project: project.name, session: name, mtime, messages });
+      }
+    }
+  }
+  sessions.sort((a, b) => a.mtime - b.mtime);
+  return sessions;
+}
+
+function historyStats(sessions) {
+  return {
+    projects_dir: PROJECTS_DIR,
+    interactive_sessions: sessions.length,
+    usable_messages: sessions.reduce((sum, s) => sum + s.messages.length, 0),
+  };
+}
+
+function historyScan() {
+  const stats = historyStats(interactiveSessions());
+  const eligible =
+    stats.interactive_sessions >= ELIGIBLE_MIN_SESSIONS &&
+    stats.usable_messages >= ELIGIBLE_MIN_MESSAGES;
+  return { ok: true, action: "history_scan", ...stats, eligible, wrote: "nothing" };
+}
+
+function dedupeChunks(chunks) {
+  const seen = new Set();
+  const unique = [];
+  for (const chunk of chunks) {
+    const key = chunk.text.slice(0, 80).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(chunk);
+  }
+  return unique;
+}
+
+function memoryChunks() {
+  const chunks = [];
+  if (!fs.existsSync(PROJECTS_DIR)) return chunks;
+  for (const project of fs.readdirSync(PROJECTS_DIR, { withFileTypes: true })) {
+    if (chunks.length >= MEMORY_CHUNK_CAP) break;
+    if (!project.isDirectory()) continue;
+    const memoryDir = path.join(PROJECTS_DIR, project.name, "memory");
+    if (!fs.existsSync(memoryDir)) continue;
+    for (const name of fs.readdirSync(memoryDir).sort()) {
+      if (chunks.length >= MEMORY_CHUNK_CAP) break;
+      if (!name.endsWith(".md")) continue;
+      let text;
+      try {
+        text = fs.readFileSync(path.join(memoryDir, name), "utf8");
+      } catch {
+        continue;
+      }
+      if (text.startsWith("---")) {
+        const end = text.indexOf("---", 4);
+        if (end > 0) text = text.slice(end + 3).trim();
+      }
+      for (const paragraph of text.split("\n\n")) {
+        if (chunks.length >= MEMORY_CHUNK_CAP) break;
+        const trimmed = paragraph.trim();
+        if (!trimmed) continue;
+        const lines = trimmed.split("\n");
+        const listLines = lines.filter((l) => /^\s*([-*#]|\d+\.)/.test(l)).length;
+        if (lines.length > 2 && listLines / lines.length > 0.5) continue;
+        const words = trimmed.split(/\s+/).length;
+        if (words >= 15 && words <= 120) {
+          chunks.push({ text: trimmed, source: `${project.name}/memory/${name}` });
+        }
+      }
+    }
+  }
+  return chunks;
+}
+
+function historyExtract() {
+  const status = loadStatus();
+  if (status.mode !== "active") throw new Error("Enter Claude Kickstart before extracting history");
+  const sessions = interactiveSessions().slice(-EXTRACT_SESSION_CAP);
+  const transcripts = dedupeChunks(
+    sessions.flatMap((s) =>
+      s.messages.map((text) => ({ text, project: s.project, session: s.session })),
+    ),
+  );
+  const memory = dedupeChunks(memoryChunks());
+  const stats = {
+    ...historyStats(sessions),
+    transcript_chunks: transcripts.length,
+    memory_chunks: memory.length,
+  };
+  writeJson(PRO_CORPUS_FILE, {
+    schema_version: 1,
+    generated_at: now(),
+    note:
+      "Local extraction of the user's own Claude Code history for portrait synthesis. " +
+      "Transcript chunks are firsthand (typed by the user). Memory chunks are secondhand " +
+      "(assistant-authored notes) and may support inferences but never facts.",
+    stats,
+    transcripts,
+    memory,
+  });
+  return {
+    ok: true,
+    action: "history_extracted",
+    ...stats,
+    corpus_file: path.relative(ROOT, PRO_CORPUS_FILE),
+  };
+}
+
 function doctor() {
   const required = [
     path.join(ROOT, ".claude", "commands", "kickstart.md"),
@@ -555,6 +734,7 @@ function usage() {
       "request-reset | reset --confirm | portrait-clear --confirm",
       "evidence <type> [note] | guidance <adaptive|simpler|advanced>",
       "level <0..4> --confirm | hook-context",
+      "history-scan | history-extract",
     ],
   };
 }
@@ -622,6 +802,12 @@ async function main() {
         break;
       case "hook-context":
         hookContext();
+        break;
+      case "history-scan":
+        print(historyScan());
+        break;
+      case "history-extract":
+        print(historyExtract());
         break;
       default:
         print(usage());
