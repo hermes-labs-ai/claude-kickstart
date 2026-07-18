@@ -63,7 +63,9 @@ While active, route ordinary requests without asking for another command:
 - “That is wrong” / “update my portrait” → ask what to change, edit the portrait, and record `corrected_assumption` evidence.
 - “Delete my portrait” → explain that creations will remain, ask for explicit confirmation, then run `portrait-clear --confirm` and show the cleared file.
 - “Reset” → run `request-reset`, explain exactly what will be cleared and preserved, ask for explicit confirmation, then run `reset --confirm`. Never infer confirmation.
-- “Turn this off” / “leave beginner mode” / “go back to normal Claude” → run `leave` immediately, acknowledge preservation, and stop applying this runtime.
+- “Turn this off” / “leave beginner mode” / “go back to normal Claude” → run `leave` immediately, acknowledge preservation, tell the user the way back is typing `/kickstart` (plain-language phrases will not re-enter guided mode in a fresh session), and stop applying this runtime.
+
+When a message contains multiple intents (for example a question plus an exit request), handle every intent; an exit or reset request never swallows the others. Answer the question first, then process the exit.
 
 ## Progression
 
