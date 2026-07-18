@@ -12,23 +12,24 @@ You need [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) 
 
 Open Claude Code in an empty folder and paste this sentence:
 
-> Help me install Claude Kickstart from https://github.com/hermes-labs-ai/claude-kickstart in this current empty folder. I am completely new to Claude Code. Before you download anything, briefly explain what it is, confirm everything will stay inside this project, and tell me that I will close and reopen Claude Code once so the native project command and safety settings can load. Then install it and give me the exact folder plus copy-paste steps to exit, reopen Claude Code there, and type `/kickstart`, including what to do if that command is not recognized.
+> Install Claude Kickstart from https://github.com/hermes-labs-ai/claude-kickstart and walk me through it — I'm new to this.
 
-Claude will explain the download before doing it, install everything in the current folder, and then print the exact path and commands for the one required reopen. Claude Code discovers newly installed project commands and settings when a session starts, so this reopen is part of installation—not an error.
+That is enough. The repository carries its own instructions for the installing agent
+(`AGENTS.md`): it will briefly explain what Kickstart is before downloading anything, keep
+everything inside your folder, run the installer, and hand you **one copy-paste line** that
+starts Kickstart. On a Mac the installer even puts that line on your clipboard for you.
 
-The handoff will look like this, using your actual folder path:
-
-1. Type `/exit` in Claude Code.
-2. Run the exact `cd` command the installer gives you.
-3. Run `claude`.
-4. If Claude Code shows a workspace trust screen, confirm it names the folder the installer printed, review the project permissions, and choose **Yes, I trust this folder**.
-5. In the newly opened session, type:
+The line looks like this (with your real folder path):
 
 ```text
-/kickstart
+cd -- /path/to/your/folder && claude "/kickstart"
 ```
 
-That is the only Kickstart command you need to begin.
+Paste it into your terminal (type `/exit` first if you're still inside Claude Code) and
+Kickstart begins. The same line works any time you come back — nothing to memorize. If a
+workspace trust screen appears, confirm it names your folder, review the project
+permissions, and choose **Yes, I trust this folder**. The one close-and-reopen is how Claude
+Code discovers newly installed project commands — part of installation, not an error.
 
 ## What your first session feels like
 

@@ -12,9 +12,9 @@ Say: “I am going to show you a terminal that does not expect you to speak term
 
 Have your friend paste:
 
-> Help me install Claude Kickstart from https://github.com/hermes-labs-ai/claude-kickstart in this current empty folder. I am completely new to Claude Code. Before you download anything, briefly explain what it is, confirm everything will stay inside this project, and tell me that I will close and reopen Claude Code once so the native project command and safety settings can load. Then install it and give me the exact folder plus copy-paste steps to exit, reopen Claude Code there, and type `/kickstart`, including what to do if that command is not recognized.
+> Install Claude Kickstart from https://github.com/hermes-labs-ai/claude-kickstart and walk me through it — I'm new to this.
 
-Claude should explain the download first, install locally, and print the exact folder and commands. Have your friend follow them literally: `/exit`, the printed `cd` command, `claude`, approve the workspace trust screen after verifying the folder and permissions, then `/kickstart`. This one reopen is required by Claude Code's native project-command and settings lifecycle.
+The repository's `AGENTS.md` instructs the installing agent: it explains the download before doing anything, keeps everything inside the folder, and ends with **one copy-paste line** (`cd -- <folder> && claude "/kickstart"`) — on a Mac the installer also puts it on the clipboard. Have your friend type `/exit`, paste that one line, and approve the workspace trust screen after verifying the folder and permissions. This one reopen is required by Claude Code's native project-command and settings lifecycle; there are no steps to memorize, and the same line is how they come back tomorrow.
 
 Let them choose the safest option. Then encourage dictation or typing:
 

@@ -14,3 +14,4 @@ claude-kickstart/state/*.md
 claude-kickstart/creations/*
 !claude-kickstart/state/.gitignore
 !claude-kickstart/creations/.gitignore
+_workspace/

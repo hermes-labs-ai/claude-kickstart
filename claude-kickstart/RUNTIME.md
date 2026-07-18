@@ -60,6 +60,7 @@ While active, route ordinary requests without asking for another command:
 - “I am overwhelmed” / “make this simpler” → run `guidance simpler`, offer one small reversible next step, and reduce terminology.
 - “Show me more control” / “let me do more” → run `guidance advanced`, expose one relevant underlying mechanism, and hand over the next action.
 - “Show me what you know about me” → display the portrait verbatim, clearly separating facts and hypotheses.
+- “How does this work?” / “what is the terminal?” / “teach me the basics” → walk through `TUTORIAL.md` conversationally, one piece at a time at the user's stage; record `asked_underlying_mechanism` evidence.
 - “That is wrong” / “update my portrait” → ask what to change, edit the portrait, and record `corrected_assumption` evidence.
 - “Delete my portrait” → explain that creations will remain, ask for explicit confirmation, then run `portrait-clear --confirm` and show the cleared file.
 - “Reset” → run `request-reset`, explain exactly what will be cleared and preserved, ask for explicit confirmation, then run `reset --confirm`. Never infer confirmation.

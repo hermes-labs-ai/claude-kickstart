@@ -81,17 +81,26 @@ try {
     Pop-Location
 }
 
+$StartLine = "Set-Location -LiteralPath '$Root'; claude '/kickstart'"
+
 Write-Host 'Claude Kickstart installation succeeded.'
 Write-Host "What changed: $Changed."
 Write-Host 'Nothing was written to global Claude Code settings or outside this repository.'
 Write-Host "Open this exact folder: $Root"
-Write-Host 'Claude Code must be closed and reopened once so the new project command and safety settings load.'
-Write-Host 'Do these exact steps:'
-Write-Host '1. In the current Claude Code conversation, type: /exit'
-Write-Host '2. Back in PowerShell, run:'
-Write-Host "   Set-Location -LiteralPath '$Root'"
-Write-Host '3. Run: claude'
-Write-Host '4. If a workspace trust screen appears, confirm it shows the exact folder above, review the project permissions, and choose: Yes, I trust this folder'
-Write-Host '5. In the newly opened Claude Code conversation, type: /kickstart'
-Write-Host 'If /kickstart is not recognized, type /exit, run the exact Set-Location and claude commands above again, then retry /kickstart.'
-Write-Host 'If it still fails, ask Claude to verify .claude/commands/kickstart.md in the exact folder above and repair only this project-local installation.'
+Write-Host 'Claude Code must be closed and reopened once so the new project command and safety settings load — part of installation, not an error.'
+Write-Host ''
+Write-Host '──────────────── COPY THIS ONE LINE ────────────────'
+Write-Host $StartLine
+Write-Host '────────────────────────────────────────────────────'
+Write-Host ''
+Write-Host 'If you are inside Claude Code right now, type: /exit — then paste the line into PowerShell and Kickstart begins.'
+Write-Host 'The same line works any time you want to come back — you never need to remember a command.'
+Write-Host 'If a workspace trust screen appears, confirm it shows this exact folder, review the project permissions, and choose: Yes, I trust this folder.'
+Write-Host 'If /kickstart is not recognized, paste the same line again; if it still fails, ask Claude to verify .claude/commands/kickstart.md in this folder and repair only this project-local installation.'
+
+try {
+    Set-Clipboard -Value $StartLine -ErrorAction Stop
+    Write-Host '(Already copied to your clipboard — just paste.)'
+} catch {
+    # Clipboard is a convenience only; never fail installation over it.
+}

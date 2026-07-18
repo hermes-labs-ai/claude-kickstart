@@ -62,17 +62,24 @@ if ! DOCTOR_OUTPUT=$(cd "$ROOT" && node claude-kickstart/bin/kickstart-state.mjs
   fail "$DOCTOR_OUTPUT" "$CHANGED"
 fi
 
+START_LINE=$(printf 'cd -- %q && claude "/kickstart"' "$ROOT")
+
 printf '%s\n' "Claude Kickstart installation succeeded."
 printf '%s\n' "What changed: $CHANGED."
 printf '%s\n' "Nothing was written to global Claude Code settings or outside this repository."
 printf '%s\n' "Open this exact folder: $ROOT"
-printf '%s\n' "Claude Code must be closed and reopened once so the new project command and safety settings load."
-printf '%s\n' "Do these exact steps:"
-printf '%s\n' "1. In the current Claude Code conversation, type: /exit"
-printf '%s\n' "2. Back in the terminal, run:"
-printf '   cd -- %q\n' "$ROOT"
-printf '%s\n' "3. Run: claude"
-printf '%s\n' "4. If a workspace trust screen appears, confirm it shows the exact folder above, review the project permissions, and choose: Yes, I trust this folder"
-printf '%s\n' "5. In the newly opened Claude Code conversation, type: /kickstart"
-printf '%s\n' "If /kickstart is not recognized, type /exit, run the exact cd and claude commands above again, then retry /kickstart."
-printf '%s\n' "If it still fails, ask Claude to verify .claude/commands/kickstart.md in the exact folder above and repair only this project-local installation."
+printf '%s\n' "Claude Code must be closed and reopened once so the new project command and safety settings load — part of installation, not an error."
+printf '%s\n' ""
+printf '%s\n' "──────────────── COPY THIS ONE LINE ────────────────"
+printf '%s\n' "$START_LINE"
+printf '%s\n' "────────────────────────────────────────────────────"
+printf '%s\n' ""
+printf '%s\n' "If you are inside Claude Code right now, type: /exit — then paste the line into your terminal and Kickstart begins."
+printf '%s\n' "The same line works any time you want to come back — you never need to remember a command."
+printf '%s\n' "If a workspace trust screen appears, confirm it shows this exact folder, review the project permissions, and choose: Yes, I trust this folder."
+printf '%s\n' "If /kickstart is not recognized, paste the same line again; if it still fails, ask Claude to verify .claude/commands/kickstart.md in this folder and repair only this project-local installation."
+
+if command -v pbcopy >/dev/null 2>&1; then
+  printf '%s' "$START_LINE" | pbcopy 2>/dev/null \
+    && printf '%s\n' "(Already copied to your clipboard — just paste.)"
+fi

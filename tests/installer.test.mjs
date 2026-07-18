@@ -39,10 +39,11 @@ test("shell installer works by absolute path, is repeatable, and writes no tempo
   assert.match(first.stdout, new RegExp(`Open this exact folder: ${repo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
   assert.match(first.stdout, /must be closed and reopened once/);
   assert.match(first.stdout, /type: \/exit/);
-  assert.match(first.stdout, /Run: claude/);
+  assert.match(first.stdout, /COPY THIS ONE LINE/);
+  assert.match(first.stdout, /cd -- .* && claude "\/kickstart"/);
+  assert.match(first.stdout, /works any time you want to come back/);
   assert.match(first.stdout, /workspace trust screen/);
   assert.match(first.stdout, /Yes, I trust this folder/);
-  assert.match(first.stdout, /type: \/kickstart/);
   assert.match(first.stdout, /If \/kickstart is not recognized/);
   assert.equal(JSON.parse(fs.readFileSync(state, "utf8")).mode, "inactive");
   const before = digest(state);
@@ -77,20 +78,23 @@ test("missing required file produces beginner-readable failure with no guessed r
   assert.equal(fs.existsSync(missing), false);
 });
 
-test("beginner quick start explains and completes the one required reopen", () => {
+test("beginner quick start is one paste sentence backed by AGENTS.md enforcement", () => {
   const readme = fs.readFileSync(path.join(SOURCE, "README.md"), "utf8");
   const demo = fs.readFileSync(path.join(SOURCE, "DEMO.md"), "utf8");
+  const agents = fs.readFileSync(path.join(SOURCE, "AGENTS.md"), "utf8");
+  // The user-facing paste prompt stays one short sentence in both docs.
   for (const text of [readme, demo]) {
-    assert.match(text, /I am completely new to Claude Code/);
-    assert.match(text, /Before you download anything/);
-    assert.match(text, /everything will stay inside this project/);
-    assert.match(text, /close and reopen Claude Code once/);
-    assert.match(text, /exact folder plus copy-paste steps/);
-    assert.match(text, /if that command is not recognized/);
+    assert.match(text, /Install Claude Kickstart from https:\/\/github\.com\/hermes-labs-ai\/claude-kickstart and walk me through it/);
+    assert.match(text, /claude "\/kickstart"/);
   }
-  assert.match(readme, /type `\/exit`/);
-  assert.match(readme, /Run the exact `cd` command/);
-  assert.match(readme, /Run `claude`/);
+  // The enforcement the old long prompt carried now lives in AGENTS.md.
+  assert.match(agents, /Before you download or run anything/);
+  assert.match(agents, /stay inside one project folder/);
+  assert.match(agents, /close and reopen Claude Code once/);
+  assert.match(agents, /one copy block/);
+  assert.match(agents, /cd -- <the exact installed folder> && claude "\/kickstart"/);
+  assert.match(agents, /If `\/kickstart` is not recognized/);
+  assert.match(readme, /close-and-reopen|close and reopen/);
 });
 
 test("installer scripts pass local static checks", () => {
@@ -108,10 +112,10 @@ test("installer scripts pass local static checks", () => {
     "Open this exact folder:",
     "must be closed and reopened once",
     "type: /exit",
-    "Run: claude",
+    "COPY THIS ONE LINE",
+    "claude '/kickstart'",
     "workspace trust screen",
     "Yes, I trust this folder",
-    "type: /kickstart",
     "If /kickstart is not recognized",
   ]) assert.match(ps, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
