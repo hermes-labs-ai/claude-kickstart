@@ -101,13 +101,23 @@ test("public privacy surface binds consent, decline, and private-corpus deletion
   const readme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
   const runtime = fs.readFileSync(path.join(ROOT, "claude-kickstart/RUNTIME.md"), "utf8");
   const pro = fs.readFileSync(path.join(ROOT, "claude-kickstart/ONBOARDING-PRO.md"), "utf8");
+  const packagedPro = fs.readFileSync(
+    path.join(ROOT, "src/claude_kickstart/assets/claude-kickstart/ONBOARDING-PRO.md"),
+    "utf8",
+  );
+  const historyInterviewCommand =
+    "`node claude-kickstart/bin/kickstart-state.mjs history-choice interview`";
   assert.match(readme, /counts-only eligibility scan/i);
   assert.match(readme, /parses candidate transcript messages but writes nothing and returns no content/i);
   assert.match(readme, /extracts eligible transcripts and memory into a private corpus only after an engine-recorded choice/i);
   assert.match(readme, /choosing the interview mechanically blocks extraction/i);
   assert.match(readme, /deleted with either “Delete my portrait” or reset/i);
   assert.match(runtime, /history-choice <use-history\|interview>/);
-  assert.match(pro, /history-choice interview/);
+  assert.equal(pro, packagedPro);
+  for (const onboardingPro of [pro, packagedPro]) {
+    assert.ok(onboardingPro.includes(historyInterviewCommand));
+    assert.equal(onboardingPro.includes("`history-choice interview`"), false);
+  }
   assert.match(pro, /history-choice use-history/);
   assert.match(pro, /Extraction rechecks both that recorded consent and current eligibility/);
 });
