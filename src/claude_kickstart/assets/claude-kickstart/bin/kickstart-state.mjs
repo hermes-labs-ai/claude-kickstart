@@ -340,6 +340,7 @@ function leave() {
       "claude-kickstart/creations/",
     ],
     clean_exit_note: "A fresh Claude Code session removes any residual instructions from the current conversation.",
+    re_entry: "The user returns by typing /kickstart. Plain-language phrases will not re-enter guided mode in a fresh session; relay the exact command.",
     status,
   };
 }

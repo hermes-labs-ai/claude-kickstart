@@ -20,11 +20,34 @@ Then ask the open prompt below in the same response only after the safety select
 
 ## `awaiting_self_description`
 
-Ask openly:
+A single wide-open "tell me about yourself" overwhelms many first users — they don't know
+what you need or why you're asking. So this stage has three parts, all within this one
+checkpointed stage.
 
-> Tell me about yourself in ordinary language. What do you do? What occupies your time? What are you interested in? What frustrates you? What do you wish you could make, understand, organize, or change? You do not need to structure the answer. Dictation mistakes and unfinished thoughts are fine.
+**Part 1 — say why, in one or two sentences, before asking anything.** In your own words:
 
-Before asking, checkpoint this stage and write the exact pending prompt to `onboarding-notes.md`. When the answer arrives, preserve its meaning in the notes, then generate two or three follow-ups that depend on what the user actually said.
+> Quick note on why I ask anything at all: I fit ideas to you from both *what* you tell me and *how* you tell it. Everything you share stays in a plain file in this folder that you can read, correct, or delete anytime. More material means better-fitted ideas — but you choose how much to share, and you can skip anything.
+
+**Part 2 — structured starters.** One `AskUserQuestion` call with these four questions
+(same for every user; free-text `Other` is automatic on each):
+
+1. header `Your days` — "What does most of your time go to right now?" — options: Working / Studying / Raising a family or caring for someone / Retired or between things. Single-select.
+2. header `Draws you` — "What kinds of things pull at you? Pick any." — options: Making something real / Understanding something deeply / Organizing chaos / Helping someone specific. **multiSelect: true.**
+3. header `Computers` — "How do you feel about computers?" — options: Honestly pretty new to this / I get by / Comfortable / This part is easy for me. Single-select.
+4. header `First win` — "What would feel best first?" — options: A small finished thing today / The first step of something bigger / Just understanding what's possible. Single-select.
+
+**Part 3 — the open door, now smaller and explained.** After their selections:
+
+> Now the part only you can type: tell me a little about yourself in your own words — what you're into, what frustrates you, what you wish existed. Ramble freely; dictation mistakes and half-thoughts are fine. Even two sentences is plenty — the questions I ask next will do the rest.
+
+Before asking each part, checkpoint this stage and write the exact pending prompt to `onboarding-notes.md`. Record the structured selections AND the free text in the notes. Then generate two or three follow-ups that depend on what the user actually said.
+
+**Richness guard:** the structured answers are scaffolding, not categories — never let them
+narrow the portrait or the possibilities. The free text and generated follow-ups remain the
+primary material; a user whose selections say "Retired / Organizing chaos" but whose words
+are all about story-writing gets story-writing possibilities. If the free text is rich, the
+selections merely confirm register; if the free text is thin, the selections carry more
+weight and your follow-ups should reopen the door the open question couldn't.
 
 ## `awaiting_followup_1` through `awaiting_followup_3`
 

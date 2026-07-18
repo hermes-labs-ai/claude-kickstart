@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import filecmp
+import shlex
 import shutil
 import subprocess
 import sys
@@ -58,7 +59,13 @@ def install(target: Path) -> int:
         if result.returncode:
             raise RuntimeError(result.stderr.strip() or result.stdout.strip())
     print(f"Claude Kickstart is ready. Added {created} missing project-local file(s).")
-    print("Restart Claude Code in this folder once, then run: /kickstart")
+    print("Claude Code must be closed and reopened once so the project command loads — part of installation, not an error.")
+    print()
+    print("──────────────── COPY THIS ONE LINE ────────────────")
+    print(f'cd -- {shlex.quote(str(target))} && claude "/kickstart"')
+    print("────────────────────────────────────────────────────")
+    print()
+    print("Paste it into your terminal (type /exit first if you are inside Claude Code). The same line works any time you want to come back.")
     return 0
 
 
