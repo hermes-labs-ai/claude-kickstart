@@ -91,7 +91,9 @@ test("public privacy surface binds consent, decline, and private-corpus deletion
   const readme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
   const runtime = fs.readFileSync(path.join(ROOT, "claude-kickstart/RUNTIME.md"), "utf8");
   const pro = fs.readFileSync(path.join(ROOT, "claude-kickstart/ONBOARDING-PRO.md"), "utf8");
-  assert.match(readme, /engine-recorded choice/i);
+  assert.match(readme, /counts-only eligibility scan/i);
+  assert.match(readme, /parses candidate transcript messages but writes nothing and returns no content/i);
+  assert.match(readme, /extracts eligible transcripts and memory into a private corpus only after an engine-recorded choice/i);
   assert.match(readme, /choosing the interview mechanically blocks extraction/i);
   assert.match(readme, /deleted with either “Delete my portrait” or reset/i);
   assert.match(runtime, /history-choice <use-history\|interview>/);
